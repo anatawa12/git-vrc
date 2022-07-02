@@ -3,6 +3,7 @@ mod macros;
 
 mod git;
 mod install;
+mod smudge;
 
 use anyhow::Result;
 use clap::Parser;
@@ -13,6 +14,7 @@ use simple_logger::SimpleLogger;
 #[clap(author, version, about)]
 enum Commands {
     Install(install::App),
+    Smudge(smudge::App),
 }
 
 fn main() -> Result<()> {
@@ -25,5 +27,6 @@ fn main() -> Result<()> {
 
     match args {
         Commands::Install(app) => app.run(),
+        Commands::Smudge(app) => app.run(),
     }
 }
