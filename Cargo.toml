@@ -12,6 +12,12 @@ readme = "README.md"
 
 [dependencies]
 anyhow = "1"
+itertools = "0.10"
+log = "0.4"
+
+[dependencies.simple_logger]
+version = "2"
+features = ["stderr"]
 
 [dependencies.clap]
 version = "3"
