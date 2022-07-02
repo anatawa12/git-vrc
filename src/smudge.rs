@@ -8,7 +8,7 @@ pub(crate) struct App {
 }
 
 impl App {
-    pub(crate) fn run() -> anyhow::Result<()> {
+    pub(crate) fn run(self) -> anyhow::Result<()> {
         let mut stdin = std::io::stdin();
         let mut stdout = std::io::stdout();
         let mut buf = vec![0 as u8; 8 * 1024];
