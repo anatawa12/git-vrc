@@ -2,7 +2,7 @@
 
 Git VRC is a command line extension for git to reduce meaningless diff on git of VRC project 
 
-This will remove local-specific attributes from `.unity` and `.prefab` file on git.
+This will remove local-specific attributes from `.asset`, `.prefab`, and `.unity` file on git.
 
 ## License
 
