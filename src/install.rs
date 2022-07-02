@@ -383,9 +383,9 @@ mod test {
             ),
             format!(
                 concat!(
-                "*.asset  eol=lf filter=vrc text\n",
-                "*.prefab text eol=lf   filter=vrc\n",
-                "*.unity {0}\n",
+                    "*.asset  eol=lf filter=vrc text\n",
+                    "*.prefab text eol=lf   filter=vrc\n",
+                    "*.unity {0}\n",
                 ),
                 super::FILE_ATTRIBUTES
             )
@@ -397,14 +397,11 @@ mod test {
                     format!("*.asset {0}", super::FILE_ATTRIBUTES).as_str(),
                     format!("*.prefab {0}", super::FILE_ATTRIBUTES).as_str(),
                     format!("*.unity {0}", super::FILE_ATTRIBUTES).as_str(),
-                ].into_iter()
+                ]
+                .into_iter()
             ),
             format!(
-                concat!(
-                "*.asset {0}\n",
-                "*.prefab {0}\n",
-                "*.unity {0}\n",
-                ),
+                concat!("*.asset {0}\n", "*.prefab {0}\n", "*.unity {0}\n",),
                 super::FILE_ATTRIBUTES
             )
         );

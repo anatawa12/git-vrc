@@ -1,11 +1,10 @@
-use std::io::{BufReader, ErrorKind, Read, Write};
 use anyhow::bail;
 use clap::Parser;
+use std::io::{BufReader, ErrorKind, Read, Write};
 
 #[derive(Parser)]
 /// Smudge file. This is currently cat command but some feature can be added later.
-pub(crate) struct App {
-}
+pub(crate) struct App {}
 
 impl App {
     pub(crate) fn run(self) -> anyhow::Result<()> {
@@ -20,7 +19,7 @@ impl App {
                 Err(e) => bail!(e),
             };
             if size == 0 {
-                break
+                break;
             }
             stdout.write(&buf[..size])?;
         }
