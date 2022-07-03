@@ -1,6 +1,7 @@
 #[macro_use]
 mod macros;
 
+mod clean;
 mod git;
 mod install;
 mod smudge;
@@ -15,6 +16,7 @@ use simple_logger::SimpleLogger;
 enum Commands {
     Install(install::App),
     Smudge(smudge::App),
+    Clean(clean::App),
 }
 
 fn main() -> Result<()> {
@@ -28,5 +30,6 @@ fn main() -> Result<()> {
     match args {
         Commands::Install(app) => app.run(),
         Commands::Smudge(app) => app.run(),
+        Commands::Clean(app) => app.run(),
     }
 }
