@@ -1,3 +1,4 @@
+use std::any::Any;
 use log::trace;
 use std::fmt::Debug;
 use std::io::stdin;
@@ -173,7 +174,7 @@ impl<'a> Iterator for YamlSeparated<'a> {
 }
 
 struct Context<'a> {
-    reference: Option<ObjectReference>,
+    inter_state: Option<Box<dyn Any>>,
     printed: usize,
     yaml: &'a str,
     mark: Marker,
@@ -186,7 +187,7 @@ impl<'a> Context<'a> {
     pub(crate) fn new(yaml: &'a str, (e, mark): (Event, Marker)) -> (Self, Event) {
         (
             Self {
-                reference: None,
+                inter_state: None,
                 printed: 0,
                 yaml,
                 mark,
@@ -233,7 +234,9 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn reference(&mut self) -> ObjectReference {
-        self.reference.take().expect("ObjectReference not parsed")
+        *self.inter_state.take()
+            .and_then(|x| x.downcast().ok())
+            .expect("ObjectReference not parsed")
     }
 }
 
@@ -494,11 +497,11 @@ mod object_reference {
                     next(PostTypeKey((*self).0))
                 }
                 MappingEnd => {
-                    _ctx.reference = Some(ObjectReference {
+                    _ctx.inter_state = Some(Box::new(ObjectReference {
                         file_id: self.0.file_id.unwrap(),
                         guid: self.0.guid,
                         obj_type: self.0.obj_type.unwrap(),
-                    });
+                    }));
                     pop_state()
                 }
                 _ => panic!("unexpected object reference key: {:?}", ev),
