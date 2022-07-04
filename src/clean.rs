@@ -211,6 +211,7 @@ impl<'a> Context<'a> {
         return e;
     }
 
+    // write until current token. including current token with margin
     pub(crate) fn write_until_current_token(&mut self) {
         trace!("write_until_current_token");
         self.copy_disabled_next = true;
@@ -221,6 +222,7 @@ impl<'a> Context<'a> {
         self.result.push_str(str);
     }
 
+    // skip until last token. skip including last token but excludes margin
     pub(crate) fn skip_until_last_token(&mut self) {
         trace!("skip_until_last_token");
         self.printed = self.last_mark.index();
