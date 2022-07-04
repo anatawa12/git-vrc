@@ -95,8 +95,8 @@ impl<'a> Context<'a> {
         return e;
     }
 
-    pub(crate) fn disable_copy_yaml_since_next_token(&mut self) {
-        trace!("disable_copy_yaml_since_next_token");
+    pub(crate) fn write_until_current_token(&mut self) {
+        trace!("write_until_current_token");
         self.copy_disabled_next = true;
     }
 
@@ -105,9 +105,11 @@ impl<'a> Context<'a> {
         self.result.push_str(str);
     }
 
-    pub(crate) fn enable_copy_yaml_since_last_token(&mut self) {
-        trace!("enable_copy_yaml_since_last_token");
+    pub(crate) fn skip_until_last_token(&mut self) {
+        trace!("skip_until_last_token");
         self.printed = self.last_mark.index();
+        let token_body = self.yaml[self.printed..self.mark.index()].trim_end();
+        self.printed += token_body.len();
     }
 
     pub(crate) fn finish(mut self) -> String {
@@ -360,7 +362,7 @@ mod mono_behaviour_mapping {
                 Scalar(name, TScalarStyle::Plain, _, None)
                     if name == "serializedUdonProgramAsset" =>
                 {
-                    _ctx.disable_copy_yaml_since_next_token();
+                    _ctx.write_until_current_token();
                     next_and_push(PostSerialized((*self).0), skip_value::SkipValue)
                 }
                 MappingEnd => pop_state(),
@@ -376,8 +378,8 @@ mod mono_behaviour_mapping {
     struct PostSerialized(ObjectReference);
     impl EventReceiver for PostSerialized {
         fn on_event(self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
-            _ctx.append_str("{fileID: 0");
-            _ctx.enable_copy_yaml_since_last_token();
+            _ctx.append_str("{fileID: 0}");
+            _ctx.skip_until_last_token();
             next_with_same(PostMScriptPreKey((*self).0))
         }
     }
