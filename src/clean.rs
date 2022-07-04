@@ -160,109 +160,6 @@ impl StringOrStr for &str {
     }
 }
 
-mod udon_program_asset_script_guid_variable {
-    use super::*;
-    use std::collections::HashSet;
-
-    static mut UDON_PROGRAM_ASSET_SCRIPT_GUID: Option<HashSet<ObjectReference>> = None;
-    static mut NOT_UDON_PROGRAM_ASSET_SCRIPT_GUID: Option<HashSet<ObjectReference>> = None;
-
-    fn get_mut() -> &'static mut HashSet<ObjectReference> {
-        unsafe { UDON_PROGRAM_ASSET_SCRIPT_GUID.get_or_insert_with(init) }
-    }
-
-    fn get_not_mut() -> &'static mut HashSet<ObjectReference> {
-        unsafe { NOT_UDON_PROGRAM_ASSET_SCRIPT_GUID.get_or_insert_with(|| HashSet::new()) }
-    }
-
-    pub(super) fn add_asset(reference: ObjectReference) {
-        get_mut().insert(reference);
-    }
-
-    pub(super) fn add_not(reference: ObjectReference) {
-        get_not_mut().insert(reference);
-    }
-
-    pub(super) fn udon_program_asset_script_guid() -> &'static HashSet<ObjectReference> {
-        get_mut()
-    }
-
-    pub(super) fn not_udon_program_asset_script_guid() -> &'static HashSet<ObjectReference> {
-        get_not_mut()
-    }
-
-    fn init() -> HashSet<ObjectReference> {
-        let mut m = HashSet::new();
-
-        // based on github search with the following query
-        //  UdonAssemblyProgramAsset \
-        //      -path:UdonAssemblyProgramAssetImporter.cs \
-        //      -path:UdonSharpEditorUtility.cs \
-        //      -path:/UdonAssemblyProgramAsset(|Editor).cs$/ \
-        //      -path:/UdonSharpProgramAsset.cs/ \
-        //      -path:UdonSharpCompiler \
-        //      -path:UdonBehaviourEditor.cs \
-        //      -path:UdonGraphProgramAsset.cs \
-        //      -path:UdonGraph.cs \
-        //      -path:UdonGraphProgramAssetEditor.cs
-
-        // and reply on https://twitter.com/anatawa12_vrc/status/1543515250280263680
-        //
-        // Trigger2to3 is depends on UdonSharp so nothing is needed.
-
-        // UdonProgramAsset by VRCSDK
-        m.insert(ObjectReference::new(
-            "11500000".to_owned(),
-            "264ec3c8a1d423f42a144da0df6c5ebe".to_owned(),
-            3,
-        ));
-
-        // UdonAssemblyProgramAsset by VRCSDK
-        m.insert(ObjectReference::new(
-            "11500000".to_owned(),
-            "22203902d63dec94194fefc3e155c43b".to_owned(),
-            3,
-        ));
-
-        // UdonGraphProgramAsset by VRCSDK
-        m.insert(ObjectReference::new(
-            "11500000".to_owned(),
-            "4f11136daadff0b44ac2278a314682ab".to_owned(),
-            3,
-        ));
-
-        // UdonSharpProgramAsset by UdonSharp
-        // https://github.com/vrchat-community/UdonSharp
-        m.insert(ObjectReference::new(
-            "11500000".to_owned(),
-            "c333ccfdd0cbdbc4ca30cef2dd6e6b9b".to_owned(),
-            3,
-        ));
-
-        // CyanTriggerProgramAsset by CyanTrigger
-        // https://booth.pm/en/items/3194594
-        // they're in CyanTriggerSerialized and it looks CyanTriggerSerialized is
-        // expected to be ignored but I support this.
-        m.insert(ObjectReference::new(
-            "11500000".to_owned(),
-            "62eab678c02d50042baa35d04cd0db48".to_owned(),
-            3,
-        ));
-
-        // TeuchiUdonProgramAsset by TeuchiUdon
-        // https://github.com/akanevrc/TeuchiUdon
-        m.insert(ObjectReference::new(
-            "11500000".to_owned(),
-            "b395809abe973ff4da67eb677d952047".to_owned(),
-            3,
-        ));
-
-        m
-    }
-}
-use udon_program_asset_script_guid_variable::not_udon_program_asset_script_guid;
-use udon_program_asset_script_guid_variable::udon_program_asset_script_guid;
-
 trait EventReceiver: Debug {
     fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult;
 }
@@ -463,22 +360,8 @@ mod mono_behaviour_mapping {
                 Scalar(name, TScalarStyle::Plain, _, None)
                     if name == "serializedUdonProgramAsset" =>
                 {
-                    if udon_program_asset_script_guid().contains(&(*self).0) {
-                        // it's a udon program
-                        // do not write the value of serializedUdonProgramAsset
-                        _ctx.disable_copy_yaml_since_next_token();
-                        next_and_push(PostSerialized((*self).0), skip_value::SkipValue)
-                    } else if not_udon_program_asset_script_guid().contains(&(*self).0) {
-                        // it's not a udon program: ignore
-                        next_and_push(*self, skip_value::SkipValue)
-                    } else {
-                        // it's unknown: warning and ignore.
-                        warn!(
-                            "there's MonoBehaviour with serializedUdonProgramAsset: {}",
-                            self.0.guid.as_ref().unwrap()
-                        );
-                        next_and_push(*self, skip_value::SkipValue)
-                    }
+                    _ctx.disable_copy_yaml_since_next_token();
+                    next_and_push(PostSerialized((*self).0), skip_value::SkipValue)
                 }
                 MappingEnd => pop_state(),
                 _ => next_and_push_with_same(
