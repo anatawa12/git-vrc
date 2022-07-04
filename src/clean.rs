@@ -14,7 +14,7 @@ impl App {
     pub(crate) fn run(self) -> anyhow::Result<()> {
         let mut yaml = String::new();
         stdin().read_to_string(&mut yaml)?;
-         let mut iter = YamlSeparated::new(&yaml);
+        let mut iter = YamlSeparated::new(&yaml);
         let first = iter.next().unwrap();
         print!("{}{}", first.0, first.1);
 
@@ -29,22 +29,35 @@ impl App {
     fn parse_one(&self, yaml: &str) -> anyhow::Result<()> {
         let mut parser = Parser::new(yaml.chars());
 
-        assert!(matches!(parser.next()?, (StreamStart, _)), "StreamStart expected");
-        assert!(matches!(parser.next()?, (DocumentStart, _)), "DocumentStart expected");
-        assert!(matches!(parser.next()?, (MappingStart(_), _)), "MappingStart expected");
-        let object_type = if let (Scalar(object_type, TScalarStyle::Plain, _, _), _) = parser.next()? {
-            object_type
-        } else {
-            panic!("Scalar Key to explain the type of value expected")
-        };
-        assert!(matches!(parser.next()?, (MappingStart(_), _)), "MappingStart expected");
+        assert!(
+            matches!(parser.next()?, (StreamStart, _)),
+            "StreamStart expected"
+        );
+        assert!(
+            matches!(parser.next()?, (DocumentStart, _)),
+            "DocumentStart expected"
+        );
+        assert!(
+            matches!(parser.next()?, (MappingStart(_), _)),
+            "MappingStart expected"
+        );
+        let object_type =
+            if let (Scalar(object_type, TScalarStyle::Plain, _, _), _) = parser.next()? {
+                object_type
+            } else {
+                panic!("Scalar Key to explain the type of value expected")
+            };
+        assert!(
+            matches!(parser.next()?, (MappingStart(_), _)),
+            "MappingStart expected"
+        );
 
         let initial_state: Box<dyn EventReceiver> = match object_type.as_str() {
             "MonoBehaviour" => Box::new(mono_behaviour_mapping::PreKey),
             _ => {
                 // nothing to do fot this object. print all and return
                 print!("{}", yaml);
-                return Ok(())
+                return Ok(());
             }
         };
 
@@ -86,8 +99,14 @@ impl App {
 
         // closings
         assert!(matches!(e, MappingEnd), "MappingEnd expected");
-        assert!(matches!(parser.next()?, (DocumentEnd, _)), "DocumentEnd expected");
-        assert!(matches!(parser.next()?, (StreamEnd, _)), "StreamEnd expected");
+        assert!(
+            matches!(parser.next()?, (DocumentEnd, _)),
+            "DocumentEnd expected"
+        );
+        assert!(
+            matches!(parser.next()?, (StreamEnd, _)),
+            "StreamEnd expected"
+        );
 
         print!("{}", context.finish());
         Ok(())
@@ -98,7 +117,7 @@ struct YamlSeparated<'a> {
     str: &'a str,
 }
 
-impl <'a> YamlSeparated<'a> {
+impl<'a> YamlSeparated<'a> {
     fn new(str: &'a str) -> Self {
         Self { str }
     }
@@ -109,7 +128,7 @@ impl<'a> Iterator for YamlSeparated<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.str.len() == 0 {
-            return None
+            return None;
         }
 
         let heading_line;
@@ -134,7 +153,7 @@ impl<'a> Iterator for YamlSeparated<'a> {
                 if self.str[..triple_hyphen].chars().last() == Some('\n') {
                     // it's separator!
                     i += triple_hyphen;
-                    break
+                    break;
                 } else {
                     // it's not a separator. find next
                     i += triple_hyphen;
@@ -144,12 +163,12 @@ impl<'a> Iterator for YamlSeparated<'a> {
             } else {
                 i = self.str.len();
                 // there's no separator!
-                break
+                break;
             }
         }
         self.str = &str_in[i..];
 
-        return Some((heading_line, &str_in[..i]))
+        return Some((heading_line, &str_in[..i]));
     }
 }
 
