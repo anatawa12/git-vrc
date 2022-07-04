@@ -432,7 +432,7 @@ mod mono_behaviour_mapping {
         fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
             match ev {
                 Scalar(name, TScalarStyle::Plain, _, None)
-                    if name == "serializedUdonProgramAsset" =>
+                    if name == "serializedUdonProgramAsset" || name == "serializedProgramAsset" =>
                 {
                     _ctx.write_until_current_token();
                     next_and_push(PostSerialized((*self).0), skip_value::SkipValue)
