@@ -327,8 +327,11 @@ mod mono_behaviour_mapping {
     impl EventReceiver for PreKey {
         fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
             match ev {
-                Scalar(name, TScalarStyle::Plain, _, None) if name == "m_Script" => {
-                    next_and_push(PostMScriptKey, object_reference::Parse)
+                Scalar(name, TScalarStyle::Plain, _, None)
+                    if name == "serializedUdonProgramAsset" || name == "serializedProgramAsset" =>
+                {
+                    _ctx.write_until_current_token();
+                    next_and_push(PostSerialized, skip_value::SkipValue)
                 }
                 MappingEnd => pop_state(),
                 _ => next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue),
@@ -337,41 +340,12 @@ mod mono_behaviour_mapping {
     }
 
     #[derive(Debug)]
-    pub(crate) struct PostMScriptKey;
-    impl EventReceiver for PostMScriptKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
-            let script_refrence = _ctx.reference();
-            next_with_same(PostMScriptPreKey(script_refrence))
-        }
-    }
-
-    #[derive(Debug)]
-    struct PostMScriptPreKey(ObjectReference);
-    impl EventReceiver for PostMScriptPreKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Scalar(name, TScalarStyle::Plain, _, None)
-                    if name == "serializedUdonProgramAsset" || name == "serializedProgramAsset" =>
-                {
-                    _ctx.write_until_current_token();
-                    next_and_push(PostSerialized((*self).0), skip_value::SkipValue)
-                }
-                MappingEnd => pop_state(),
-                _ => next_and_push_with_same(
-                    generic::PostKey(PostMScriptPreKey((*self).0)),
-                    skip_value::SkipValue,
-                ),
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    struct PostSerialized(ObjectReference);
+    struct PostSerialized;
     impl EventReceiver for PostSerialized {
         fn on_event(self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
             _ctx.append_str("{fileID: 0}");
             _ctx.skip_until_last_token();
-            next_with_same(PostMScriptPreKey((*self).0))
+            next_with_same(PreKey)
         }
     }
 }
