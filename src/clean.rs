@@ -1,8 +1,7 @@
-use log::{info, trace};
+use log::trace;
 use std::fmt::Debug;
 use std::io::stdin;
 use std::io::Read;
-use std::panic::catch_unwind;
 use yaml_rust::parser::*;
 use yaml_rust::scanner::*;
 use Event::*;
@@ -30,8 +29,27 @@ impl App {
     fn parse_one(&self, yaml: &str) -> anyhow::Result<()> {
         let mut parser = Parser::new(yaml.chars());
 
+        assert!(matches!(parser.next()?, (StreamStart, _)), "StreamStart expected");
+        assert!(matches!(parser.next()?, (DocumentStart, _)), "DocumentStart expected");
+        assert!(matches!(parser.next()?, (MappingStart(_), _)), "MappingStart expected");
+        let object_type = if let (Scalar(object_type, TScalarStyle::Plain, _, _), _) = parser.next()? {
+            object_type
+        } else {
+            panic!("Scalar Key to explain the type of value expected")
+        };
+        assert!(matches!(parser.next()?, (MappingStart(_), _)), "MappingStart expected");
+
+        let initial_state: Box<dyn EventReceiver> = match object_type.as_str() {
+            "MonoBehaviour" => Box::new(mono_behaviour_mapping::PreKey),
+            _ => {
+                // nothing to do fot this object. print all and return
+                print!("{}", yaml);
+                return Ok(())
+            }
+        };
+
         let mut states = Vec::<Box<dyn EventReceiver>>::new();
-        states.push(Box::new(root::Start));
+        states.push(initial_state);
         let (mut context, mut e) = Context::new(&yaml, parser.next()?);
 
         while !states.is_empty() {
@@ -65,6 +83,12 @@ impl App {
                 }
             }
         }
+
+        // closings
+        assert!(matches!(e, MappingEnd), "MappingEnd expected");
+        assert!(matches!(parser.next()?, (DocumentEnd, _)), "DocumentEnd expected");
+        assert!(matches!(parser.next()?, (StreamEnd, _)), "StreamEnd expected");
+
         print!("{}", context.finish());
         Ok(())
     }
@@ -288,111 +312,6 @@ mod generic {
     impl<R: EventReceiver + 'static> EventReceiver for PostKey<R> {
         fn on_event(self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
             next_and_push_with_same((*self).0, skip_value::SkipValue)
-        }
-    }
-}
-
-/// root (list of document) layer
-mod root {
-    use super::*;
-
-    #[derive(Debug)]
-    pub(crate) struct Start;
-
-    impl EventReceiver for Start {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            if matches!(ev, StreamStart) {
-                next(FileRoot)
-            } else {
-                panic!("no StreamStart at first")
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    pub(crate) struct FileRoot;
-
-    impl EventReceiver for FileRoot {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                StreamEnd => pop_state(),
-                DocumentStart => next_and_push(*self, document::Root),
-                _ => panic!("unexpected state {:?}", ev),
-            }
-        }
-    }
-}
-
-/// document (contains one mapping) layer
-mod document {
-    use super::*;
-
-    #[derive(Debug)]
-    pub(crate) struct Root;
-
-    impl EventReceiver for Root {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                MappingStart(_) => next_and_push(End, root_mapping::PreKey),
-                _ => next_and_push(End, skip_value::SkipValue),
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    pub(crate) struct End;
-
-    impl EventReceiver for End {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            if !matches!(ev, DocumentEnd) {
-                panic!("DocumentEnd expected")
-            }
-            pop_state()
-        }
-    }
-}
-
-/// root mapping layer (generic)
-mod root_mapping {
-    use super::*;
-
-    #[derive(Debug)]
-    pub(crate) struct PreKey;
-
-    impl EventReceiver for PreKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Scalar(name, TScalarStyle::Plain, _, None) if name == "MonoBehaviour" => {
-                    next(MonoBehaviourPostKey)
-                }
-                _ => next_and_push_with_same(generic::PostKey(EndOfRoot), skip_value::SkipValue),
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    struct EndOfRoot;
-
-    impl EventReceiver for EndOfRoot {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            if !matches!(ev, MappingEnd) {
-                panic!("MappingEnd expected")
-            }
-            pop_state()
-        }
-    }
-
-    ////////////////////////////////////////////////
-
-    #[derive(Debug)]
-    struct MonoBehaviourPostKey;
-
-    impl EventReceiver for MonoBehaviourPostKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                MappingStart(_) => next_and_push(EndOfRoot, mono_behaviour_mapping::PreKey),
-                _ => panic!("the value of MonoBehaviour is not Mapping: {:?}", ev),
-            }
         }
     }
 }
