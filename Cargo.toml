@@ -1,3 +1,9 @@
+[workspace]
+members = [
+    ".",
+    "yaml-rust",
+]
+
 [package]
 name = "git-vrc"
 version = "0.1.0"
@@ -14,7 +20,7 @@ readme = "README.md"
 anyhow = "1"
 itertools = "0.10"
 log = "0.4"
-yaml-rust = "0.4"
+yaml-rust = { path = "yaml-rust" }
 
 [dependencies.simple_logger]
 version = "2"
