@@ -1,6 +1,6 @@
 use anyhow::bail;
 use clap::Parser;
-use std::io::{BufReader, ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 
 #[derive(Parser)]
 /// Smudge file. This is currently cat command but some feature can be added later.

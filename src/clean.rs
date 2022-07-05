@@ -244,6 +244,7 @@ impl<'a> Context<'a> {
         self.result
     }
 
+    #[allow(dead_code)]
     pub(crate) fn reference(&mut self) -> ObjectReference {
         *self
             .inter_state
@@ -269,6 +270,7 @@ struct ObjectReference {
 }
 
 impl ObjectReference {
+    #[allow(dead_code)]
     pub fn new(file_id: String, guid: String, obj_type: u32) -> Self {
         Self {
             file_id,
@@ -276,6 +278,7 @@ impl ObjectReference {
             obj_type,
         }
     }
+    #[allow(dead_code)]
     pub fn local(file_id: String, obj_type: u32) -> Self {
         Self {
             file_id,
@@ -362,7 +365,6 @@ mod generic {
 /// MonoBehaviour mapping layer
 mod mono_behaviour_mapping {
     use super::*;
-    use log::warn;
 
     #[derive(Debug)]
     pub(crate) struct PreKey;

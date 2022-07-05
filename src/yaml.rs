@@ -10,7 +10,7 @@ pub struct YamlParser<'a> {
 
 impl<'a> YamlParser<'a> {
     pub fn new(src: &'a str) -> Self {
-        let mut upstream = yaml_rust::parser::Parser::new(src.chars());
+        let upstream = yaml_rust::parser::Parser::new(src.chars());
         Self { src, upstream }
     }
 
