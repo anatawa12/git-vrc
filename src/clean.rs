@@ -1,5 +1,6 @@
 use log::trace;
 use std::any::Any;
+use std::borrow::Cow;
 use std::fmt::Debug;
 use std::io::stdin;
 use std::io::Read;
@@ -22,13 +23,13 @@ impl App {
         while let Some((heading, body)) = iter.next() {
             print!("{}", heading);
             trace!("start: {}", heading);
-            self.parse_one(body)?;
+            print!("{}", App::parse_one(body)?);
         }
 
         Ok(())
     }
 
-    fn parse_one(&self, yaml: &str) -> anyhow::Result<()> {
+    fn parse_one(yaml: &str) -> anyhow::Result<Cow<str>> {
         let mut parser = crate::yaml::YamlParser::new(yaml);
 
         assert!(
@@ -59,8 +60,7 @@ impl App {
             "PrefabInstance" => Box::new(prefab_instance_mapping::PreKey),
             _ => {
                 // nothing to do fot this object. print all and return
-                print!("{}", yaml);
-                return Ok(());
+                return Ok(yaml.into());
             }
         };
 
@@ -111,8 +111,7 @@ impl App {
             "StreamEnd expected"
         );
 
-        print!("{}", context.finish());
-        Ok(())
+        Ok(context.finish().into())
     }
 }
 
