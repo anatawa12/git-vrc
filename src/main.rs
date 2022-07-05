@@ -1,3 +1,5 @@
+extern crate core;
+
 #[macro_use]
 mod macros;
 
@@ -5,6 +7,7 @@ mod clean;
 mod git;
 mod install;
 mod smudge;
+mod yaml;
 
 use anyhow::Result;
 use clap::Parser;

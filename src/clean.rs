@@ -1,5 +1,5 @@
-use std::any::Any;
 use log::trace;
+use std::any::Any;
 use std::fmt::Debug;
 use std::io::stdin;
 use std::io::Read;
@@ -21,6 +21,7 @@ impl App {
 
         while let Some((heading, body)) = iter.next() {
             print!("{}", heading);
+            trace!("start: {}", heading);
             self.parse_one(body)?;
         }
 
@@ -28,7 +29,7 @@ impl App {
     }
 
     fn parse_one(&self, yaml: &str) -> anyhow::Result<()> {
-        let mut parser = Parser::new(yaml.chars());
+        let mut parser = crate::yaml::YamlParser::new(yaml);
 
         assert!(
             matches!(parser.next()?, (StreamStart, _)),
@@ -55,6 +56,7 @@ impl App {
 
         let initial_state: Box<dyn EventReceiver> = match object_type.as_str() {
             "MonoBehaviour" => Box::new(mono_behaviour_mapping::PreKey),
+            "PrefabInstance" => Box::new(prefab_instance_mapping::PreKey),
             _ => {
                 // nothing to do fot this object. print all and return
                 print!("{}", yaml);
@@ -204,11 +206,20 @@ impl<'a> Context<'a> {
         self.mark = mark;
 
         if self.copy_disabled_next {
-            self.result.push_str(&self.yaml[self.printed..mark.index()]);
+            self.result
+                .push_str(&self.yaml[self.printed..mark.begin().index()]);
+            self.printed = mark.begin().index();
             self.copy_disabled_next = false;
         }
 
         return e;
+    }
+
+    // write until last token. including current token with margin
+    pub(crate) fn write_until_last_token(&mut self) {
+        trace!("write_until_last_token");
+        self.result.push_str(&self.yaml[self.printed..self.last_mark.begin().index()]);
+        self.printed = self.last_mark.begin().index();
     }
 
     // write until current token. including current token with margin
@@ -225,9 +236,7 @@ impl<'a> Context<'a> {
     // skip until last token. skip including last token but excludes margin
     pub(crate) fn skip_until_last_token(&mut self) {
         trace!("skip_until_last_token");
-        self.printed = self.last_mark.index();
-        let token_body = self.yaml[self.printed..self.mark.index()].trim_end();
-        self.printed += token_body.len();
+        self.printed = self.last_mark.end().index();
     }
 
     pub(crate) fn finish(mut self) -> String {
@@ -236,7 +245,17 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn reference(&mut self) -> ObjectReference {
-        *self.inter_state.take()
+        *self
+            .inter_state
+            .take()
+            .and_then(|x| x.downcast().ok())
+            .expect("ObjectReference not parsed")
+    }
+
+    pub(crate) fn bool(&mut self) -> bool {
+        *self
+            .inter_state
+            .take()
             .and_then(|x| x.downcast().ok())
             .expect("ObjectReference not parsed")
     }
@@ -370,6 +389,169 @@ mod mono_behaviour_mapping {
             _ctx.append_str("{fileID: 0}");
             _ctx.skip_until_last_token();
             next_with_same(PreKey)
+        }
+    }
+}
+
+/// PrefabInstance mapping layer
+mod prefab_instance_mapping {
+    use super::*;
+
+    #[derive(Debug)]
+    pub(crate) struct PreKey;
+
+    impl EventReceiver for PreKey {
+        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
+            match ev {
+                Scalar(name, TScalarStyle::Plain, _, None) if name == "m_Modification" => {
+                    next(PostModificationKey)
+                }
+                MappingEnd => pop_state(),
+                _ => next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct PostModificationKey;
+    impl EventReceiver for PostModificationKey {
+        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
+            assert!(
+                matches!(ev, MappingStart(_)),
+                "MappingStart required but was {:?}",
+                ev
+            );
+            next_and_push(PreKey, modifications::PreKey)
+        }
+    }
+
+    mod modifications {
+        use super::*;
+
+        #[derive(Debug)]
+        pub(crate) struct PreKey;
+
+        impl EventReceiver for PreKey {
+            fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
+                match ev {
+                    Scalar(name, TScalarStyle::Plain, _, None) if name == "m_Modifications" => {
+                        _ctx.write_until_current_token();
+                        next(PostModificationsKey)
+                    }
+                    MappingEnd => pop_state(),
+                    _ => next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue),
+                }
+            }
+        }
+
+        #[derive(Debug)]
+        pub(crate) struct PostModificationsKey;
+
+        impl EventReceiver for PostModificationsKey {
+            fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
+                assert!(
+                    matches!(ev, SequenceStart(_)),
+                    "SequenceStart required but was {:?}",
+                    ev
+                );
+                next_and_push(PreKey, ModificationSequence(false))
+            }
+        }
+
+        #[derive(Debug)]
+        // true if some element are written
+        struct ModificationSequence(bool);
+
+        impl EventReceiver for ModificationSequence {
+            fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
+                // TODO: pop values?
+                // TODO: write?
+                if matches!(ev, SequenceEnd) {
+                    return pop_state();
+                }
+                assert!(
+                    matches!(ev, MappingStart(_)),
+                    "MappingStart required but was {:?}",
+                    ev
+                );
+                _ctx.inter_state = Some(Box::new(false));
+                next_and_push(
+                    ModificationSequenceAfter((*self).0),
+                    modification_mapping::PreKey,
+                )
+            }
+        }
+
+        #[derive(Debug)]
+        struct ModificationSequenceAfter(bool);
+
+        impl EventReceiver for ModificationSequenceAfter {
+            fn on_event(mut self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
+                if _ctx.bool() {
+                    // わかったこと: MappingStart の marker は非ブロックだと:のいちになるので、次のトークンよりあとになる。謎仕様。
+                    trace!("ModificationSequenceAfter:skip_until_last_token: {:?}", _ev);
+                    // the last element is serializedProgramAsset
+                    _ctx.skip_until_last_token()
+                } else {
+                    trace!(
+                        "ModificationSequenceAfter:write_until_last_token: {:?}",
+                        _ev
+                    );
+                    _ctx.write_until_last_token();
+                    (*self).0 = true;
+                }
+                next_with_same(ModificationSequence((*self).0))
+            }
+        }
+
+        mod modification_mapping {
+            use super::*;
+
+            #[derive(Debug)]
+            pub(crate) struct PreKey;
+
+            impl EventReceiver for PreKey {
+                fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
+                    match ev {
+                        Nothing => unreachable!(),
+                        StreamStart => unreachable!(),
+                        StreamEnd => unreachable!(),
+                        DocumentStart => unreachable!(),
+                        DocumentEnd => unreachable!(),
+                        SequenceEnd => unreachable!(),
+                        MappingEnd => pop_state(),
+                        Scalar(key, TScalarStyle::Plain, _, _) if key == "propertyPath" => {
+                            next(PostPropertyPathKey)
+                        }
+                        Alias(_) => next(generic::PostKey(PreKey)),
+                        Scalar(_, _, _, _) => next(generic::PostKey(PreKey)),
+                        SequenceStart(_) => {
+                            next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue)
+                        }
+                        MappingStart(_) => {
+                            next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue)
+                        }
+                    }
+                }
+            }
+
+            #[derive(Debug)]
+            struct PostPropertyPathKey;
+
+            impl EventReceiver for PostPropertyPathKey {
+                fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
+                    if let Scalar(name, _, _, _) = ev {
+                        if name == "serializedProgramAsset" {
+                            _ctx.inter_state = Some(Box::new(true));
+                            next(PreKey)
+                        } else {
+                            next(PreKey)
+                        }
+                    } else {
+                        panic!("Scalar required")
+                    }
+                }
+            }
         }
     }
 }
