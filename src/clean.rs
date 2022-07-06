@@ -737,3 +737,230 @@ mod object_reference {
     }
 }
 // endregion
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn udon_program_asset() -> anyhow::Result<()> {
+        assert_eq!(App::parse_one(concat!(
+        "MonoBehaviour:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  m_CorrespondingSourceObject: {fileID: 0}\n",
+        "  m_PrefabInstance: {fileID: 0}\n",
+        "  m_PrefabAsset: {fileID: 0}\n",
+        "  m_GameObject: {fileID: 0}\n",
+        "  m_Enabled: 1\n",
+        "  m_EditorHideFlags: 0\n",
+        "  m_Script: {fileID: 11500000, guid: 22203902d63dec94194fefc3e155c43b, type: 3}\n",
+        "  m_Name: New Udon Assembly Program Asset\n",
+        "  m_EditorClassIdentifier:\n",
+        "  serializedUdonProgramAsset: {fileID: 11400000, guid: aa8a5233c74e54f108dfb136df564958,\n",
+        "    type: 2}\n",
+        "  udonAssembly:\n",
+        "  assemblyError:\n",
+        ))?, concat!(
+        "MonoBehaviour:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  m_CorrespondingSourceObject: {fileID: 0}\n",
+        "  m_PrefabInstance: {fileID: 0}\n",
+        "  m_PrefabAsset: {fileID: 0}\n",
+        "  m_GameObject: {fileID: 0}\n",
+        "  m_Enabled: 1\n",
+        "  m_EditorHideFlags: 0\n",
+        "  m_Script: {fileID: 11500000, guid: 22203902d63dec94194fefc3e155c43b, type: 3}\n",
+        "  m_Name: New Udon Assembly Program Asset\n",
+        "  m_EditorClassIdentifier:\n",
+        "  serializedUdonProgramAsset: {fileID: 0}\n",
+        "  udonAssembly:\n",
+        "  assemblyError:\n",
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn udon_behaviour() -> anyhow::Result<()> {
+        assert_eq!(App::parse_one(concat!(
+        "MonoBehaviour:\n",
+        "  m_ObjectHideFlags: 2\n",
+        "  m_CorrespondingSourceObject: {fileID: 0}\n",
+        "  m_PrefabInstance: {fileID: 0}\n",
+        "  m_PrefabAsset: {fileID: 0}\n",
+        "  m_GameObject: {fileID: 543750916}\n",
+        "  m_Enabled: 1\n",
+        "  m_EditorHideFlags: 0\n",
+        "  m_Script: {fileID: 11500000, guid: 45115577ef41a5b4ca741ed302693907, type: 3}\n",
+        "  m_Name:\n",
+        "  m_EditorClassIdentifier:\n",
+        "  interactTextPlacement: {fileID: 0}\n",
+        "  interactText: Use\n",
+        "  interactTextGO: {fileID: 0}\n",
+        "  proximity: 2\n",
+        "  SynchronizePosition: 0\n",
+        "  AllowCollisionOwnershipTransfer: 0\n",
+        "  Reliable: 0\n",
+        "  _syncMethod: 2\n",
+        "  serializedProgramAsset: {fileID: 11400000, guid: c6a719d47b234de46a0d92f561e78003,\n",
+        "    type: 2}\n",
+        "  programSource: {fileID: 11400000, guid: dcb91414824c30d4fbd7b30116027c36, type: 2}\n",
+        "  serializedPublicVariablesBytesString: Ai8AAAAAATIAAABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAuAFUAZABvAG4AVgBhAHIAaQBhAGIAbABlAFQAYQBiAGwAZQAsACAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4AAAAAAAYBAAAAAAAAACcBBAAAAHQAeQBwAGUAAWgAAABTAHkAcwB0AGUAbQAuAEMAbwBsAGwAZQBjAHQAaQBvAG4AcwAuAEcAZQBuAGUAcgBpAGMALgBMAGkAcwB0AGAAMQBbAFsAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4ALgBJAG4AdABlAHIAZgBhAGMAZQBzAC4ASQBVAGQAbwBuAFYAYQByAGkAYQBiAGwAZQAsACAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4AXQBdACwAIABtAHMAYwBvAHIAbABpAGIAAQEJAAAAVgBhAHIAaQBhAGIAbABlAHMALwEAAAABaAAAAFMAeQBzAHQAZQBtAC4AQwBvAGwAbABlAGMAdABpAG8AbgBzAC4ARwBlAG4AZQByAGkAYwAuAEwAaQBzAHQAYAAxAFsAWwBWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAuAEkAbgB0AGUAcgBmAGEAYwBlAHMALgBJAFUAZABvAG4AVgBhAHIAaQBhAGIAbABlACwAIABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgBdAF0ALAAgAG0AcwBjAG8AcgBsAGkAYgABAAAABgMAAAAAAAAAAi8CAAAAAWEAAABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAuAFUAZABvAG4AVgBhAHIAaQBhAGIAbABlAGAAMQBbAFsAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4ARwBhAG0AZQBPAGIAagBlAGMAdAAsACAAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4AQwBvAHIAZQBNAG8AZAB1AGwAZQBdAF0ALAAgAFYAUgBDAC4AVQBkAG8AbgAuAEMAbwBtAG0AbwBuAAIAAAAGAgAAAAAAAAAnAQQAAAB0AHkAcABlAAEXAAAAUwB5AHMAdABlAG0ALgBTAHQAcgBpAG4AZwAsACAAbQBzAGMAbwByAGwAaQBiACcBCgAAAFMAeQBtAGIAbwBsAE4AYQBtAGUAAQYAAABlAG4AYQBiAGwAZQAnAQQAAAB0AHkAcABlAAEXAAAAUwB5AHMAdABlAG0ALgBPAGIAagBlAGMAdAAsACAAbQBzAGMAbwByAGwAaQBiAC0BBQAAAFYAYQBsAHUAZQAHBQIvAwAAAAFjAAAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4ALgBVAGQAbwBuAFYAYQByAGkAYQBiAGwAZQBgADEAWwBbAFUAbgBpAHQAeQBFAG4AZwBpAG4AZQAuAEcAYQBtAGUATwBiAGoAZQBjAHQAWwBdACwAIABVAG4AaQB0AHkARQBuAGcAaQBuAGUALgBDAG8AcgBlAE0AbwBkAHUAbABlAF0AXQAsACAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4AAwAAAAYCAAAAAAAAACcBBAAAAHQAeQBwAGUAARcAAABTAHkAcwB0AGUAbQAuAFMAdAByAGkAbgBnACwAIABtAHMAYwBvAHIAbABpAGIAJwEKAAAAUwB5AG0AYgBvAGwATgBhAG0AZQABCAAAAGQAaQBzAGEAYgBsAGUAcwAnAQQAAAB0AHkAcABlAAEwAAAAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4ARwBhAG0AZQBPAGIAagBlAGMAdABbAF0ALAAgAFUAbgBpAHQAeQBFAG4AZwBpAG4AZQAuAEMAbwByAGUATQBvAGQAdQBsAGUAAQEFAAAAVgBhAGwAdQBlAC8EAAAAATAAAABVAG4AaQB0AHkARQBuAGcAaQBuAGUALgBHAGEAbQBlAE8AYgBqAGUAYwB0AFsAXQAsACAAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4AQwBvAHIAZQBNAG8AZAB1AGwAZQAEAAAABgAAAAAAAAAABwUHBQIvBQAAAAFJAAAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4ALgBVAGQAbwBuAFYAYQByAGkAYQBiAGwAZQBgADEAWwBbAFMAeQBzAHQAZQBtAC4ASQBuAHQAMwAyACwAIABtAHMAYwBvAHIAbABpAGIAXQBdACwAIABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAFAAAABgIAAAAAAAAAJwEEAAAAdAB5AHAAZQABFwAAAFMAeQBzAHQAZQBtAC4AUwB0AHIAaQBuAGcALAAgAG0AcwBjAG8AcgBsAGkAYgAnAQoAAABTAHkAbQBiAG8AbABOAGEAbQBlAAEfAAAAXwBfAF8AVQBkAG8AbgBTAGgAYQByAHAAQgBlAGgAYQB2AGkAbwB1AHIAVgBlAHIAcwBpAG8AbgBfAF8AXwAnAQQAAAB0AHkAcABlAAEWAAAAUwB5AHMAdABlAG0ALgBJAG4AdAAzADIALAAgAG0AcwBjAG8AcgBsAGkAYgAXAQUAAABWAGEAbAB1AGUAAgAAAAcFBwUHBQ==\n",
+        "  publicVariablesUnityEngineObjects: []\n",
+        "  publicVariablesSerializationDataFormat: 0\n",
+        ))?, concat!(
+        "MonoBehaviour:\n",
+        "  m_ObjectHideFlags: 2\n",
+        "  m_CorrespondingSourceObject: {fileID: 0}\n",
+        "  m_PrefabInstance: {fileID: 0}\n",
+        "  m_PrefabAsset: {fileID: 0}\n",
+        "  m_GameObject: {fileID: 543750916}\n",
+        "  m_Enabled: 1\n",
+        "  m_EditorHideFlags: 0\n",
+        "  m_Script: {fileID: 11500000, guid: 45115577ef41a5b4ca741ed302693907, type: 3}\n",
+        "  m_Name:\n",
+        "  m_EditorClassIdentifier:\n",
+        "  interactTextPlacement: {fileID: 0}\n",
+        "  interactText: Use\n",
+        "  interactTextGO: {fileID: 0}\n",
+        "  proximity: 2\n",
+        "  SynchronizePosition: 0\n",
+        "  AllowCollisionOwnershipTransfer: 0\n",
+        "  Reliable: 0\n",
+        "  _syncMethod: 2\n",
+        "  serializedProgramAsset: {fileID: 0}\n",
+        "  programSource: {fileID: 11400000, guid: dcb91414824c30d4fbd7b30116027c36, type: 2}\n",
+        "  serializedPublicVariablesBytesString: Ai8AAAAAATIAAABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAuAFUAZABvAG4AVgBhAHIAaQBhAGIAbABlAFQAYQBiAGwAZQAsACAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4AAAAAAAYBAAAAAAAAACcBBAAAAHQAeQBwAGUAAWgAAABTAHkAcwB0AGUAbQAuAEMAbwBsAGwAZQBjAHQAaQBvAG4AcwAuAEcAZQBuAGUAcgBpAGMALgBMAGkAcwB0AGAAMQBbAFsAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4ALgBJAG4AdABlAHIAZgBhAGMAZQBzAC4ASQBVAGQAbwBuAFYAYQByAGkAYQBiAGwAZQAsACAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4AXQBdACwAIABtAHMAYwBvAHIAbABpAGIAAQEJAAAAVgBhAHIAaQBhAGIAbABlAHMALwEAAAABaAAAAFMAeQBzAHQAZQBtAC4AQwBvAGwAbABlAGMAdABpAG8AbgBzAC4ARwBlAG4AZQByAGkAYwAuAEwAaQBzAHQAYAAxAFsAWwBWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAuAEkAbgB0AGUAcgBmAGEAYwBlAHMALgBJAFUAZABvAG4AVgBhAHIAaQBhAGIAbABlACwAIABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgBdAF0ALAAgAG0AcwBjAG8AcgBsAGkAYgABAAAABgMAAAAAAAAAAi8CAAAAAWEAAABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAuAFUAZABvAG4AVgBhAHIAaQBhAGIAbABlAGAAMQBbAFsAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4ARwBhAG0AZQBPAGIAagBlAGMAdAAsACAAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4AQwBvAHIAZQBNAG8AZAB1AGwAZQBdAF0ALAAgAFYAUgBDAC4AVQBkAG8AbgAuAEMAbwBtAG0AbwBuAAIAAAAGAgAAAAAAAAAnAQQAAAB0AHkAcABlAAEXAAAAUwB5AHMAdABlAG0ALgBTAHQAcgBpAG4AZwAsACAAbQBzAGMAbwByAGwAaQBiACcBCgAAAFMAeQBtAGIAbwBsAE4AYQBtAGUAAQYAAABlAG4AYQBiAGwAZQAnAQQAAAB0AHkAcABlAAEXAAAAUwB5AHMAdABlAG0ALgBPAGIAagBlAGMAdAAsACAAbQBzAGMAbwByAGwAaQBiAC0BBQAAAFYAYQBsAHUAZQAHBQIvAwAAAAFjAAAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4ALgBVAGQAbwBuAFYAYQByAGkAYQBiAGwAZQBgADEAWwBbAFUAbgBpAHQAeQBFAG4AZwBpAG4AZQAuAEcAYQBtAGUATwBiAGoAZQBjAHQAWwBdACwAIABVAG4AaQB0AHkARQBuAGcAaQBuAGUALgBDAG8AcgBlAE0AbwBkAHUAbABlAF0AXQAsACAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4AAwAAAAYCAAAAAAAAACcBBAAAAHQAeQBwAGUAARcAAABTAHkAcwB0AGUAbQAuAFMAdAByAGkAbgBnACwAIABtAHMAYwBvAHIAbABpAGIAJwEKAAAAUwB5AG0AYgBvAGwATgBhAG0AZQABCAAAAGQAaQBzAGEAYgBsAGUAcwAnAQQAAAB0AHkAcABlAAEwAAAAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4ARwBhAG0AZQBPAGIAagBlAGMAdABbAF0ALAAgAFUAbgBpAHQAeQBFAG4AZwBpAG4AZQAuAEMAbwByAGUATQBvAGQAdQBsAGUAAQEFAAAAVgBhAGwAdQBlAC8EAAAAATAAAABVAG4AaQB0AHkARQBuAGcAaQBuAGUALgBHAGEAbQBlAE8AYgBqAGUAYwB0AFsAXQAsACAAVQBuAGkAdAB5AEUAbgBnAGkAbgBlAC4AQwBvAHIAZQBNAG8AZAB1AGwAZQAEAAAABgAAAAAAAAAABwUHBQIvBQAAAAFJAAAAVgBSAEMALgBVAGQAbwBuAC4AQwBvAG0AbQBvAG4ALgBVAGQAbwBuAFYAYQByAGkAYQBiAGwAZQBgADEAWwBbAFMAeQBzAHQAZQBtAC4ASQBuAHQAMwAyACwAIABtAHMAYwBvAHIAbABpAGIAXQBdACwAIABWAFIAQwAuAFUAZABvAG4ALgBDAG8AbQBtAG8AbgAFAAAABgIAAAAAAAAAJwEEAAAAdAB5AHAAZQABFwAAAFMAeQBzAHQAZQBtAC4AUwB0AHIAaQBuAGcALAAgAG0AcwBjAG8AcgBsAGkAYgAnAQoAAABTAHkAbQBiAG8AbABOAGEAbQBlAAEfAAAAXwBfAF8AVQBkAG8AbgBTAGgAYQByAHAAQgBlAGgAYQB2AGkAbwB1AHIAVgBlAHIAcwBpAG8AbgBfAF8AXwAnAQQAAAB0AHkAcABlAAEWAAAAUwB5AHMAdABlAG0ALgBJAG4AdAAzADIALAAgAG0AcwBjAG8AcgBsAGkAYgAXAQUAAABWAGEAbAB1AGUAAgAAAAcFBwUHBQ==\n",
+        "  publicVariablesUnityEngineObjects: []\n",
+        "  publicVariablesSerializationDataFormat: 0\n",
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn prefab_with_other_modification_at_heading() -> anyhow::Result<()> {
+        // TODO
+        assert_eq!(
+            App::parse_one(concat!(
+        "--- !u!1001 &8809592113139104831\n",
+        "PrefabInstance:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  serializedVersion: 2\n",
+        "  m_Modification:\n",
+        "    m_TransformParent: {fileID: 0}\n",
+        "    m_Modifications:\n",
+        "    - target: {fileID: 690848371401817423, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+        "        type: 3}\n",
+        "      propertyPath: m_Name\n",
+        "      value: GameObject\n",
+        "      objectReference: {fileID: 0}\n",
+        "    - target: {fileID: 9122363655180540528, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+        "        type: 3}\n",
+        "      propertyPath: serializedProgramAsset\n",
+        "      value:\n",
+        "      objectReference: {fileID: 11400000, guid: 7f6636ec3d2154e059e383d146a28a59,\n",
+        "        type: 2}\n",
+        "    m_RemovedComponents: []\n",
+        "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+        ))?,
+            concat!(
+        "--- !u!1001 &8809592113139104831\n",
+        "PrefabInstance:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  serializedVersion: 2\n",
+        "  m_Modification:\n",
+        "    m_TransformParent: {fileID: 0}\n",
+        "    m_Modifications:\n",
+        "    - target: {fileID: 690848371401817423, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+        "        type: 3}\n",
+        "      propertyPath: m_Name\n",
+        "      value: GameObject\n",
+        "      objectReference: {fileID: 0}\n",
+        "    m_RemovedComponents: []\n",
+        "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+        )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prefab_with_other_modification_at_last() -> anyhow::Result<()> {
+        // TODO
+        assert_eq!(
+            App::parse_one(concat!(
+        "--- !u!1001 &8809592113139104831\n",
+        "PrefabInstance:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  serializedVersion: 2\n",
+        "  m_Modification:\n",
+        "    m_TransformParent: {fileID: 0}\n",
+        "    m_Modifications:\n",
+        "    - target: {fileID: 9122363655180540528, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+        "        type: 3}\n",
+        "      propertyPath: serializedProgramAsset\n",
+        "      value:\n",
+        "      objectReference: {fileID: 11400000, guid: 7f6636ec3d2154e059e383d146a28a59,\n",
+        "        type: 2}\n",
+        "    - target: {fileID: 690848371401817423, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+        "        type: 3}\n",
+        "      propertyPath: m_Name\n",
+        "      value: GameObject\n",
+        "      objectReference: {fileID: 0}\n",
+        "    m_RemovedComponents: []\n",
+        "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+        ))?,
+            concat!(
+        "--- !u!1001 &8809592113139104831\n",
+        "PrefabInstance:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  serializedVersion: 2\n",
+        "  m_Modification:\n",
+        "    m_TransformParent: {fileID: 0}\n",
+        "    m_Modifications:\n",
+        "    - target: {fileID: 690848371401817423, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+        "        type: 3}\n",
+        "      propertyPath: m_Name\n",
+        "      value: GameObject\n",
+        "      objectReference: {fileID: 0}\n",
+        "    m_RemovedComponents: []\n",
+        "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+        )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prefab_without_other_modification() -> anyhow::Result<()> {
+        // TODO
+        assert_eq!(
+            App::parse_one(concat!(
+        "--- !u!1001 &8809592113139104831\n",
+        "PrefabInstance:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  serializedVersion: 2\n",
+        "  m_Modification:\n",
+        "    m_TransformParent: {fileID: 0}\n",
+        "    m_Modifications:\n",
+        "    - target: {fileID: 9122363655180540528, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+        "        type: 3}\n",
+        "      propertyPath: serializedProgramAsset\n",
+        "      value:\n",
+        "      objectReference: {fileID: 11400000, guid: 7f6636ec3d2154e059e383d146a28a59,\n",
+        "        type: 2}\n",
+        "    m_RemovedComponents: []\n",
+        "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+        ))?,
+            concat!(
+        "--- !u!1001 &8809592113139104831\n",
+        "PrefabInstance:\n",
+        "  m_ObjectHideFlags: 0\n",
+        "  serializedVersion: 2\n",
+        "  m_Modification:\n",
+        "    m_TransformParent: {fileID: 0}\n",
+        "    m_Modifications: []\n",
+        "    m_RemovedComponents: []\n",
+        "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+        )
+        );
+        Ok(())
+    }
+}
