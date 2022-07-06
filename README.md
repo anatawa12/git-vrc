@@ -11,6 +11,9 @@ This tool is not yet published however, you can install via cargo with the follo
 It's planned to publish this tool via .zip file, homebrew (for linux and macos), and msi installer (for windows).
 
 ```sh
+# If you are not installed rust,
+# please follow the following instruction to install rust
+# https://www.rust-lang.org/tools/install
 $ cargo install --locked --git 'https://github.com/anatawa12/git-vrc.git'
 ```
 
