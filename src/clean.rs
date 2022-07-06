@@ -217,7 +217,8 @@ impl<'a> Context<'a> {
     // write until last token. including current token with margin
     pub(crate) fn write_until_last_token(&mut self) {
         trace!("write_until_last_token");
-        self.result.push_str(&self.yaml[self.printed..self.last_mark.begin().index()]);
+        self.result
+            .push_str(&self.yaml[self.printed..self.last_mark.begin().index()]);
         self.printed = self.last_mark.begin().index();
     }
 

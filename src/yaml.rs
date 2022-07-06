@@ -1,6 +1,6 @@
 use std::str::Chars;
-use yaml_rust::{Event, ScanError};
 use yaml_rust::scanner::Marker;
+use yaml_rust::{Event, ScanError};
 
 /// a wrapper of rust_yaml
 pub struct YamlParser<'a> {
@@ -18,9 +18,7 @@ impl<'a> YamlParser<'a> {
         let (event, marker) = self.upstream.next()?;
         let (_, next_marker) = self.upstream.peek()?;
         match (&event, self.src[marker.begin().index()..].chars().nth(0)) {
-            (Event::MappingStart(_), Some(':')) => {
-                Ok((event, Marker::emtpy(*next_marker.begin())))
-            }
+            (Event::MappingStart(_), Some(':')) => Ok((event, Marker::emtpy(*next_marker.begin()))),
             _ => Ok((event, marker)),
         }
     }
