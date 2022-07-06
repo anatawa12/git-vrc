@@ -31,6 +31,7 @@ And to add .gitattributes to your repository, run the following command.
 ```sh
 $ cd /path/to/YourUnityProject
 $ git vrc install --attributes
+$ git add .gitattributes
 ```
 
 OR you can manually write .gitattributes as following
@@ -39,6 +40,16 @@ OR you can manually write .gitattributes as following
 *.asset filter=vrc eol=lf text
 *.prefab filter=vrc eol=lf text
 *.unity filter=vrc eol=lf text
+```
+
+Finally, if there already are some commits with unity files,
+force git to re-index unity files!
+
+```sh
+# touch all files in your repository to let git re-index files.
+$ find . -type f -print0 | xargs -0 touch
+# and commit this
+$ git commit -a "chore: start using git-vrc"
 ```
 
 ## License
