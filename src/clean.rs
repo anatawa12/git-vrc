@@ -1,6 +1,7 @@
 use log::trace;
 use std::any::Any;
 use std::borrow::Cow;
+use std::convert::Infallible;
 use std::fmt::Debug;
 use std::io::stdin;
 use std::io::Read;
@@ -55,9 +56,7 @@ impl App {
             "MappingStart expected"
         );
 
-        let initial_state: Box<dyn EventReceiver> = match object_type.as_str() {
-            "MonoBehaviour" => Box::new(mono_behaviour_mapping::PreKey),
-            "PrefabInstance" => Box::new(prefab_instance_mapping::PreKey),
+        let initial_state = match object_type.as_str() {
             _ => {
                 // nothing to do fot this object. print all and return
                 return Ok(yaml.into());
@@ -184,6 +183,8 @@ struct Context<'a> {
     result: String,
 }
 
+type ParserResult<T = ()> = Result<T, Infallible>;
+
 impl<'a> Context<'a> {
     pub(crate) fn new(yaml: &'a str, (e, mark): (Event, Marker)) -> (Self, Event) {
         (
@@ -212,6 +213,23 @@ impl<'a> Context<'a> {
         }
 
         return e;
+    }
+
+    pub(crate) fn peek(&mut self) -> ParserResult<&Event> {
+        todo!()
+    }
+
+    pub(crate) fn next(&mut self) -> ParserResult<Event> {
+        todo!()
+    }
+
+    pub(crate) fn next_scalar(
+        &mut self,
+    ) -> ParserResult<(String, TScalarStyle, usize, Option<TokenType>)> {
+        match self.next()? {
+            Scalar(value, style, anchor_id, tag) => Ok((value, style, anchor_id, tag)),
+            e => panic!("scalar expected but was: {:?}", e),
+        }
     }
 
     // write until last token. including current token with margin
@@ -264,27 +282,41 @@ impl<'a> Context<'a> {
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
 struct ObjectReference {
-    file_id: String,
+    file_id: u64,
     guid: Option<String>,
     obj_type: u32,
 }
 
 impl ObjectReference {
     #[allow(dead_code)]
-    pub fn new(file_id: String, guid: String, obj_type: u32) -> Self {
+    pub fn new(file_id: u64, guid: String, obj_type: u32) -> Self {
         Self {
             file_id,
             guid: Some(guid),
             obj_type,
         }
     }
+
     #[allow(dead_code)]
-    pub fn local(file_id: String, obj_type: u32) -> Self {
+    pub fn local(file_id: u64, obj_type: u32) -> Self {
         Self {
             file_id,
             guid: None,
             obj_type,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn null() -> Self {
+        Self {
+            file_id: 0,
+            guid: None,
+            obj_type: 0,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        return self.file_id == 0;
     }
 }
 
@@ -348,393 +380,180 @@ fn pop_state() -> ReceiveResult {
     ReceiveResult::PopState
 }
 
-/// generic states
-mod generic {
-    use super::*;
-
-    #[derive(Debug)]
-    pub(crate) struct PostKey<R>(pub R);
-
-    impl<R: EventReceiver + 'static> EventReceiver for PostKey<R> {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
-            next_and_push_with_same((*self).0, skip_value::SkipValue)
-        }
-    }
-}
-
-/// MonoBehaviour mapping layer
-mod mono_behaviour_mapping {
-    use super::*;
-
-    #[derive(Debug)]
-    pub(crate) struct PreKey;
-
-    impl EventReceiver for PreKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Scalar(name, TScalarStyle::Plain, _, None)
-                    if name == "serializedUdonProgramAsset" || name == "serializedProgramAsset" =>
+/// MonoBehaviour
+fn mono_behaviour(ctx: &mut Context) -> ParserResult {
+    assert!(matches!(ctx.next()?, MappingStart(_)));
+    loop {
+        match ctx.next()? {
+            MappingEnd => return Ok(()),
+            Scalar(name, _, _, None) => match name.as_str() {
+                "serializedVersion" => {
+                    assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
+                }
+                "serializedUdonProgramAsset" | "serializedProgramAsset"
+                    if matches!(ctx.peek()?, MappingStart(_)) =>
                 {
-                    _ctx.write_until_current_token();
-                    next_and_push(PostSerialized, skip_value::SkipValue)
+                    // for serializedUdonProgramAsset or serializedProgramAsset with mapping,
+                    // this tool assume the value as reference to SerializedUdonPrograms/<guid>.asset
+                    ctx.write_until_current_token();
+                    skip_next_value(ctx)?;
+                    ctx.append_str("{fileID: 0}");
+                    ctx.skip_until_last_token();
                 }
-                MappingEnd => pop_state(),
-                _ => next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue),
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    struct PostSerialized;
-    impl EventReceiver for PostSerialized {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
-            _ctx.append_str("{fileID: 0}");
-            _ctx.skip_until_last_token();
-            next_with_same(PreKey)
+                _ => skip_next_value(ctx)?,
+            },
+            // skip value
+            _ => skip_next_value(ctx)?,
         }
     }
 }
 
-/// PrefabInstance mapping layer
-mod prefab_instance_mapping {
-    use super::*;
-
-    #[derive(Debug)]
-    pub(crate) struct PreKey;
-
-    impl EventReceiver for PreKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Scalar(name, TScalarStyle::Plain, _, None) if name == "m_Modification" => {
-                    next(PostModificationKey)
+/// PrefabInstance
+fn prefab_instance(ctx: &mut Context) -> ParserResult {
+    assert!(matches!(ctx.next()?, MappingStart(_)));
+    loop {
+        match ctx.next()? {
+            MappingEnd => return Ok(()),
+            Scalar(name, _, _, None) => match name.as_str() {
+                "serializedVersion" => {
+                    assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
                 }
-                MappingEnd => pop_state(),
-                _ => next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue),
+                "m_Modification" => prefab_instance_modification(ctx)?,
+                _ => skip_next_value(ctx)?,
+            },
+            // skip value
+            _ => skip_next_value(ctx)?,
+        }
+    }
+}
+
+fn prefab_instance_modification(ctx: &mut Context) -> ParserResult {
+    assert!(matches!(ctx.next()?, MappingStart(_)));
+    loop {
+        match ctx.next()? {
+            MappingEnd => return Ok(()),
+            Scalar(name, _, _, None) if name == "m_Modifications" => {
+                prefab_instance_modifications_sequence(ctx)?
+            }
+            // skip value
+            _ => skip_next_value(ctx)?,
+        }
+    }
+}
+
+fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
+    ctx.write_until_current_token();
+
+    assert!(matches!(ctx.next()?, SequenceStart(_)));
+    while let MappingStart(_) = ctx.peek()? {
+        ctx.next()?;
+        let mut target: Option<ObjectReference> = None;
+        let mut property_path: Option<String> = None;
+        let mut value: Option<String> = None;
+        let mut object_reference: Option<ObjectReference> = None;
+        while let Scalar(_, _, _, _) = ctx.peek()? {
+            let (name, _, _, _) = ctx.next_scalar()?;
+            match name.as_str() {
+                "target" => target = Some(parse_object_reference(ctx)?),
+                "propertyPath" => property_path = Some(ctx.next_scalar()?.0),
+                "value" => value = Some(ctx.next_scalar()?.0),
+                "objectReference" => object_reference = Some(parse_object_reference(ctx)?),
+                unknown => panic!("unknown key on PrefabInstance modifications: {}", unknown),
+            }
+        }
+        assert!(matches!(ctx.next()?, MappingEnd));
+
+        // check if current modification is for keep or remove
+        #[allow(unused_variables)]
+        {
+            let target = target.expect("target not specified in prefab modifications");
+            let value = value.expect("value not specified in prefab modifications");
+            let property_path =
+                property_path.expect("propertyPath not specified in prefab modifications");
+            let object_reference =
+                object_reference.expect("objectReference not specified in prefab modifications");
+
+            match property_path.as_str() {
+                "serializedProgramAsset" if value.is_empty() => ctx.skip_until_last_token(),
+                _ => ctx.write_until_last_token(),
             }
         }
     }
-
-    #[derive(Debug)]
-    pub(crate) struct PostModificationKey;
-    impl EventReceiver for PostModificationKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            assert!(
-                matches!(ev, MappingStart(_)),
-                "MappingStart required but was {:?}",
-                ev
-            );
-            next_and_push(PreKey, modifications::PreKey)
-        }
-    }
-
-    mod modifications {
-        use super::*;
-
-        #[derive(Debug)]
-        pub(crate) struct PreKey;
-
-        impl EventReceiver for PreKey {
-            fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-                match ev {
-                    Scalar(name, TScalarStyle::Plain, _, None) if name == "m_Modifications" => {
-                        _ctx.write_until_current_token();
-                        next(PostModificationsKey)
-                    }
-                    MappingEnd => pop_state(),
-                    _ => next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue),
-                }
-            }
-        }
-
-        #[derive(Debug)]
-        pub(crate) struct PostModificationsKey;
-
-        impl EventReceiver for PostModificationsKey {
-            fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-                assert!(
-                    matches!(ev, SequenceStart(_)),
-                    "SequenceStart required but was {:?}",
-                    ev
-                );
-                next_and_push(PreKey, ModificationSequence(false))
-            }
-        }
-
-        #[derive(Debug)]
-        // true if some element are written
-        struct ModificationSequence(bool);
-
-        impl EventReceiver for ModificationSequence {
-            fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-                // TODO: pop values?
-                // TODO: write?
-                if matches!(ev, SequenceEnd) {
-                    return pop_state();
-                }
-                assert!(
-                    matches!(ev, MappingStart(_)),
-                    "MappingStart required but was {:?}",
-                    ev
-                );
-                _ctx.inter_state = Some(Box::new(false));
-                next_and_push(
-                    ModificationSequenceAfter((*self).0),
-                    modification_mapping::PreKey,
-                )
-            }
-        }
-
-        #[derive(Debug)]
-        struct ModificationSequenceAfter(bool);
-
-        impl EventReceiver for ModificationSequenceAfter {
-            fn on_event(mut self: Box<Self>, _ctx: &mut Context, _ev: &Event) -> ReceiveResult {
-                if _ctx.bool() {
-                    // わかったこと: MappingStart の marker は非ブロックだと:のいちになるので、次のトークンよりあとになる。謎仕様。
-                    trace!("ModificationSequenceAfter:skip_until_last_token: {:?}", _ev);
-                    // the last element is serializedProgramAsset
-                    _ctx.skip_until_last_token()
-                } else {
-                    trace!(
-                        "ModificationSequenceAfter:write_until_last_token: {:?}",
-                        _ev
-                    );
-                    _ctx.write_until_last_token();
-                    (*self).0 = true;
-                }
-                next_with_same(ModificationSequence((*self).0))
-            }
-        }
-
-        mod modification_mapping {
-            use super::*;
-
-            #[derive(Debug)]
-            pub(crate) struct PreKey;
-
-            impl EventReceiver for PreKey {
-                fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-                    match ev {
-                        Nothing => unreachable!(),
-                        StreamStart => unreachable!(),
-                        StreamEnd => unreachable!(),
-                        DocumentStart => unreachable!(),
-                        DocumentEnd => unreachable!(),
-                        SequenceEnd => unreachable!(),
-                        MappingEnd => pop_state(),
-                        Scalar(key, TScalarStyle::Plain, _, _) if key == "propertyPath" => {
-                            next(PostPropertyPathKey)
-                        }
-                        Alias(_) => next(generic::PostKey(PreKey)),
-                        Scalar(_, _, _, _) => next(generic::PostKey(PreKey)),
-                        SequenceStart(_) => {
-                            next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue)
-                        }
-                        MappingStart(_) => {
-                            next_and_push_with_same(generic::PostKey(PreKey), skip_value::SkipValue)
-                        }
-                    }
-                }
-            }
-
-            #[derive(Debug)]
-            struct PostPropertyPathKey;
-
-            impl EventReceiver for PostPropertyPathKey {
-                fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-                    if let Scalar(name, _, _, _) = ev {
-                        if name == "serializedProgramAsset" {
-                            _ctx.inter_state = Some(Box::new(true));
-                            next(PreKey)
-                        } else {
-                            next(PreKey)
-                        }
-                    } else {
-                        panic!("Scalar required")
-                    }
-                }
-            }
-        }
-    }
+    assert!(matches!(ctx.next()?, SequenceEnd));
+    Ok(())
 }
 
 // region utilities
-mod skip_value {
-    use super::*;
 
-    #[derive(Debug)]
-    pub(crate) struct SkipValue;
-
-    impl EventReceiver for SkipValue {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Nothing => unreachable!(),
-                StreamStart => unreachable!(),
-                StreamEnd => unreachable!(),
-                DocumentStart => unreachable!(),
-                DocumentEnd => unreachable!(),
-                Alias(_) => pop_state(),
-                Scalar(_, _, _, _) => pop_state(),
-                SequenceStart(_) => next(Sequence),
-                SequenceEnd => unreachable!(),
-                MappingStart(_) => next(MappingPreKey),
-                MappingEnd => unreachable!(),
+fn skip_next_value(ctx: &mut Context) -> ParserResult {
+    match ctx.next()? {
+        Nothing => unreachable!(),
+        StreamStart => unreachable!(),
+        StreamEnd => unreachable!(),
+        DocumentStart => unreachable!(),
+        DocumentEnd => unreachable!(),
+        Alias(_) => Ok(()),
+        Scalar(_, _, _, _) => Ok(()),
+        SequenceStart(_) => {
+            while !matches!(ctx.peek()?, SequenceEnd) {
+                skip_next_value(ctx)?;
             }
+            assert!(matches!(ctx.next()?, SequenceEnd));
+            Ok(())
         }
-    }
-
-    #[derive(Debug)]
-    struct Sequence;
-    impl EventReceiver for Sequence {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Nothing => unreachable!(),
-                StreamStart => unreachable!(),
-                StreamEnd => unreachable!(),
-                DocumentStart => unreachable!(),
-                DocumentEnd => unreachable!(),
-                MappingEnd => unreachable!(),
-                SequenceEnd => pop_state(),
-                Alias(_) => next(*self),
-                Scalar(_, _, _, _) => next(*self),
-                SequenceStart(_) => next_and_push(*self, Sequence),
-                MappingStart(_) => next_and_push(*self, MappingPreKey),
+        SequenceEnd => unreachable!(),
+        MappingStart(_) => {
+            while !matches!(ctx.peek()?, MappingEnd) {
+                // key and value
+                skip_next_value(ctx)?;
+                skip_next_value(ctx)?;
             }
+            assert!(matches!(ctx.next()?, MappingEnd));
+            Ok(())
         }
-    }
-
-    #[derive(Debug)]
-    struct MappingPreKey;
-    impl EventReceiver for MappingPreKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Nothing => unreachable!(),
-                StreamStart => unreachable!(),
-                StreamEnd => unreachable!(),
-                DocumentStart => unreachable!(),
-                DocumentEnd => unreachable!(),
-                SequenceEnd => unreachable!(),
-                MappingEnd => pop_state(),
-                Alias(_) => next(MappingPostKey),
-                Scalar(_, _, _, _) => next(MappingPostKey),
-                SequenceStart(_) => next_and_push(MappingPostKey, Sequence),
-                MappingStart(_) => next_and_push(MappingPostKey, MappingPreKey),
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    struct MappingPostKey;
-    impl EventReceiver for MappingPostKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Nothing => unreachable!(),
-                StreamStart => unreachable!(),
-                StreamEnd => unreachable!(),
-                DocumentStart => unreachable!(),
-                DocumentEnd => unreachable!(),
-                SequenceEnd => unreachable!(),
-                MappingEnd => unreachable!(),
-                Alias(_) => next(MappingPreKey),
-                Scalar(_, _, _, _) => next(MappingPreKey),
-                SequenceStart(_) => next_and_push(MappingPreKey, Sequence),
-                MappingStart(_) => next_and_push(MappingPreKey, MappingPreKey),
-            }
-        }
+        MappingEnd => unreachable!(),
     }
 }
 
-mod object_reference {
-    use super::*;
-    use std::str::FromStr;
-
-    #[derive(Debug)]
-    pub(crate) struct Parse;
-
-    impl EventReceiver for Parse {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            if !matches!(ev, MappingStart(_)) {
-                panic!("DocumentEnd expected")
-            }
-            next(PreKey(StateMain::default()))
+fn parse_object_reference(ctx: &mut Context) -> ParserResult<ObjectReference> {
+    assert!(matches!(ctx.next()?, MappingStart(_)));
+    let mut file_id: Option<u64> = None;
+    let mut guid: Option<String> = None;
+    let mut object_type: Option<u32> = None;
+    loop {
+        match ctx.next()? {
+            Nothing => unreachable!(),
+            StreamStart => unreachable!(),
+            StreamEnd => unreachable!(),
+            DocumentStart => unreachable!(),
+            DocumentEnd => unreachable!(),
+            Alias(_) => unreachable!(),
+            Scalar(s, _, _, _) => match s.as_str() {
+                "fileID" => file_id = Some(ctx.next_scalar()?.0.parse().unwrap()),
+                "guid" => guid = Some(ctx.next_scalar()?.0),
+                "type" => object_type = Some(ctx.next_scalar()?.0.parse().unwrap()),
+                unknown => panic!("unknown key for object reference: {}", unknown),
+            },
+            SequenceStart(_) => unreachable!(),
+            SequenceEnd => unreachable!(),
+            MappingStart(_) => unreachable!(),
+            MappingEnd => break,
         }
     }
-
-    #[derive(Default, Debug)]
-    struct StateMain {
-        file_id: Option<String>,
-        guid: Option<String>,
-        obj_type: Option<u32>,
-    }
-
-    #[derive(Debug)]
-    struct PreKey(StateMain);
-
-    impl EventReceiver for PreKey {
-        fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            match ev {
-                Scalar(name, TScalarStyle::Plain, _, None) if name == "fileID" => {
-                    next(PostFileIDKey((*self).0))
-                }
-                Scalar(name, TScalarStyle::Plain, _, None) if name == "guid" => {
-                    next(PostGUIDKey((*self).0))
-                }
-                Scalar(name, TScalarStyle::Plain, _, None) if name == "type" => {
-                    next(PostTypeKey((*self).0))
-                }
-                MappingEnd => {
-                    _ctx.inter_state = Some(Box::new(ObjectReference {
-                        file_id: self.0.file_id.unwrap(),
-                        guid: self.0.guid,
-                        obj_type: self.0.obj_type.unwrap(),
-                    }));
-                    pop_state()
-                }
-                _ => panic!("unexpected object reference key: {:?}", ev),
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    struct PostFileIDKey(StateMain);
-
-    impl EventReceiver for PostFileIDKey {
-        fn on_event(mut self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            if let Scalar(id, TScalarStyle::Plain, _, None) = ev {
-                self.0.file_id = Some(id.to_owned())
-            } else {
-                panic!("unexpected value of fileID: {:?}", ev)
-            }
-            next(PreKey((*self).0))
-        }
-    }
-
-    #[derive(Debug)]
-    struct PostGUIDKey(StateMain);
-
-    impl EventReceiver for PostGUIDKey {
-        fn on_event(mut self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            if let Scalar(id, TScalarStyle::Plain, _, None) = ev {
-                self.0.guid = Some(id.to_owned())
-            } else {
-                panic!("unexpected value of fileID: {:?}", ev)
-            }
-            next(PreKey((*self).0))
-        }
-    }
-
-    #[derive(Debug)]
-    struct PostTypeKey(StateMain);
-
-    impl EventReceiver for PostTypeKey {
-        fn on_event(mut self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult {
-            if let Scalar(id, TScalarStyle::Plain, _, None) = ev {
-                self.0.obj_type = Some(u32::from_str(&id).unwrap())
-            } else {
-                panic!("unexpected value of fileID: {:?}", ev)
-            }
-            next(PreKey((*self).0))
-        }
+    let file_id = file_id.expect("fileID does not exist");
+    if file_id == 0 {
+        Ok(ObjectReference::null())
+    } else if let Some(guid) = guid {
+        Ok(ObjectReference::new(
+            file_id,
+            guid,
+            object_type.expect("type does not exist"),
+        ))
+    } else {
+        Ok(ObjectReference::local(
+            file_id,
+            object_type.expect("type does not exist"),
+        ))
     }
 }
 // endregion
