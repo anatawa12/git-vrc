@@ -1,7 +1,5 @@
 use log::trace;
-use std::any::Any;
 use std::borrow::Cow;
-use std::convert::Infallible;
 use std::fmt::Debug;
 use std::io::stdin;
 use std::io::Read;
@@ -171,10 +169,12 @@ impl<'a> Context<'a> {
         self.last_mark = self.mark;
         if let Some((e, mark)) = self.next_token.take() {
             self.mark = Some(mark);
+            trace!("{:?}: {:?}", e, mark);
             Ok(e)
         } else {
             let (e, mark) = self.parser.next()?;
             self.mark = Some(mark);
+            trace!("{:?}: {:?}", e, mark);
             Ok(e)
         }
     }
@@ -188,12 +188,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn write_until_current_token_pre(&mut self) -> ParserResult {
-        trace!("write_until_current_token_pre");
-        self.append(self.mark.unwrap().begin().index());
-        Ok(())
-    }
-
     // write until current token. including current token with margin
     pub(crate) fn write_until_current_token(&mut self) -> ParserResult {
         trace!("write_until_current_token");
@@ -202,8 +196,26 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    pub(crate) fn skip_until_current_token_pre(&mut self) -> ParserResult {
-        trace!("skip_until_current_token_pre");
+    pub(crate) fn write_until_current_token0(&mut self) -> ParserResult {
+        trace!("write_until_current_token0");
+        self.append(self.mark.unwrap().end().index());
+        Ok(())
+    }
+
+    pub(crate) fn write_until_last_token(&mut self) -> ParserResult {
+        trace!("write_until_current_token_pre");
+        self.append(self.last_mark.unwrap().end().index());
+        Ok(())
+    }
+
+    pub(crate) fn skip_until_last_token(&mut self) -> ParserResult {
+        trace!("skip_until_last_token");
+        self.printed = self.last_mark.unwrap().end().index();
+        Ok(())
+    }
+
+    pub(crate) fn skip_until_current_token(&mut self) -> ParserResult {
+        trace!("skip_until_current_token");
         self.printed = self.mark.unwrap().end().index();
         Ok(())
     }
@@ -282,7 +294,7 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
                     ctx.write_until_current_token()?;
                     skip_next_value(ctx)?;
                     ctx.append_str("{fileID: 0}");
-                    ctx.skip_until_current_token_pre()?;
+                    ctx.skip_until_current_token()?;
                 }
                 _ => skip_next_value(ctx)?,
             },
@@ -326,9 +338,13 @@ fn prefab_instance_modification(ctx: &mut Context) -> ParserResult {
 }
 
 fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
-    ctx.write_until_current_token()?;
+    ctx.write_until_current_token0()?;
+    ctx.append_str(":");
 
+    let mut some_written = false;
     assert!(matches!(ctx.next()?, SequenceStart(_)));
+    ctx.printed += 1;
+
     while let MappingStart(_) = ctx.peek()? {
         ctx.next()?;
         let mut target: Option<ObjectReference> = None;
@@ -358,12 +374,22 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
                 object_reference.expect("objectReference not specified in prefab modifications");
 
             match property_path.as_str() {
-                "serializedProgramAsset" if value == "~" => ctx.skip_until_current_token_pre()?,
-                _ => ctx.write_until_current_token_pre()?,
+                "serializedProgramAsset" if value == "~" => ctx.skip_until_last_token()?,
+                _ => {
+                    some_written = true;
+                    ctx.write_until_last_token()?
+                },
             }
         }
     }
+    ctx.printed = ctx.last_mark.unwrap().end().index();
     assert!(matches!(ctx.next()?, SequenceEnd));
+
+    if !some_written {
+        ctx.skip_until_current_token()?;
+        ctx.append_str(" []");
+    }
+
     Ok(())
 }
 
@@ -670,6 +696,7 @@ mod test {
 
     #[test]
     fn prefab_without_any_modification() -> anyhow::Result<()> {
+        simple_logger::init_with_level(log::Level::Trace)?;
         // TODO
         assert_eq!(
             App::parse_one(concat!(
