@@ -5,6 +5,7 @@ use std::convert::Infallible;
 use std::fmt::Debug;
 use std::io::stdin;
 use std::io::Read;
+use std::mem;
 use yaml_rust::parser::*;
 use yaml_rust::scanner::*;
 use Event::*;
@@ -31,86 +32,43 @@ impl App {
     }
 
     fn parse_one(yaml: &str) -> anyhow::Result<Cow<str>> {
-        let mut parser = crate::yaml::YamlParser::new(yaml);
+        let mut ctx = Context::new(&yaml);
 
         assert!(
-            matches!(parser.next()?, (StreamStart, _)),
+            matches!(ctx.next()?, StreamStart),
             "StreamStart expected"
         );
         assert!(
-            matches!(parser.next()?, (DocumentStart, _)),
+            matches!(ctx.next()?, DocumentStart),
             "DocumentStart expected"
         );
         assert!(
-            matches!(parser.next()?, (MappingStart(_), _)),
+            matches!(ctx.next()?, MappingStart(_)),
             "MappingStart expected"
         );
-        let object_type =
-            if let (Scalar(object_type, TScalarStyle::Plain, _, _), _) = parser.next()? {
-                object_type
-            } else {
-                panic!("Scalar Key to explain the type of value expected")
-            };
-        assert!(
-            matches!(parser.next()?, (MappingStart(_), _)),
-            "MappingStart expected"
-        );
+        let (object_type, _, _, _) = ctx.next_scalar()?;
 
-        let initial_state = match object_type.as_str() {
+        match object_type.as_str() {
+            "MonoBehaviour" => mono_behaviour(&mut ctx)?,
+            "PrefabInstance" => prefab_instance(&mut ctx)?,
             _ => {
                 // nothing to do fot this object. print all and return
                 return Ok(yaml.into());
             }
         };
 
-        let mut states = Vec::<Box<dyn EventReceiver>>::new();
-        states.push(initial_state);
-        let (mut context, mut e) = Context::new(&yaml, parser.next()?);
-
-        while !states.is_empty() {
-            if log::log_enabled!(log::Level::Trace) {
-                trace!("");
-                for x in &states {
-                    trace!("stat:  {:?}", x);
-                }
-                trace!("token: {:?}, {:?}", e, context.mark);
-            }
-
-            match states.pop().unwrap().on_event(&mut context, &e) {
-                ReceiveResult::Next(s) => {
-                    states.push(s);
-                    e = context.next_token(parser.next()?);
-                }
-                ReceiveResult::NextAndPush(s0, s1) => {
-                    states.push(s0);
-                    states.push(s1);
-                    e = context.next_token(parser.next()?);
-                }
-                ReceiveResult::NextWithSame(s) => {
-                    states.push(s);
-                }
-                ReceiveResult::NextAndPushWithSame(s0, s1) => {
-                    states.push(s0);
-                    states.push(s1);
-                }
-                ReceiveResult::PopState => {
-                    e = context.next_token(parser.next()?);
-                }
-            }
-        }
-
         // closings
-        assert!(matches!(e, MappingEnd), "MappingEnd expected");
+        assert!(matches!(ctx.next()?, MappingEnd), "MappingEnd expected");
         assert!(
-            matches!(parser.next()?, (DocumentEnd, _)),
+            matches!(ctx.next()?, DocumentEnd),
             "DocumentEnd expected"
         );
         assert!(
-            matches!(parser.next()?, (StreamEnd, _)),
+            matches!(ctx.next()?, StreamEnd),
             "StreamEnd expected"
         );
 
-        Ok(context.finish().into())
+        Ok(ctx.finish().into())
     }
 }
 
@@ -174,53 +132,51 @@ impl<'a> Iterator for YamlSeparated<'a> {
 }
 
 struct Context<'a> {
-    inter_state: Option<Box<dyn Any>>,
     printed: usize,
     yaml: &'a str,
-    mark: Marker,
-    last_mark: Marker,
-    copy_disabled_next: bool,
+    parser: crate::yaml::YamlParser<'a>,
+    last_mark: Option<Marker>,
+    mark: Option<Marker>,
+    next_token: Option<(Event, Marker)>,
     result: String,
 }
 
-type ParserResult<T = ()> = Result<T, Infallible>;
+type ParserResult<T = ()> = Result<T, ScanError>;
 
 impl<'a> Context<'a> {
-    pub(crate) fn new(yaml: &'a str, (e, mark): (Event, Marker)) -> (Self, Event) {
-        (
-            Self {
-                inter_state: None,
-                printed: 0,
-                yaml,
-                mark,
-                last_mark: mark,
-                copy_disabled_next: false,
-                result: String::with_capacity(yaml.len()),
-            },
-            e,
-        )
-    }
-
-    pub(crate) fn next_token(&mut self, (e, mark): (Event, Marker)) -> Event {
-        self.last_mark = self.mark;
-        self.mark = mark;
-
-        if self.copy_disabled_next {
-            self.result
-                .push_str(&self.yaml[self.printed..mark.begin().index()]);
-            self.printed = mark.begin().index();
-            self.copy_disabled_next = false;
+    pub(crate) fn new(yaml: &'a str) -> Self {
+        Self {
+            printed: 0,
+            yaml,
+            parser: crate::yaml::YamlParser::new(yaml),
+            last_mark: None,
+            mark: None,
+            next_token: None,
+            result: String::with_capacity(yaml.len()),
         }
-
-        return e;
     }
 
     pub(crate) fn peek(&mut self) -> ParserResult<&Event> {
-        todo!()
+        // because get_or_insert_with cannot return result,
+        // this reimplement get_or_insert_with.
+        if matches!(self.next_token, None) {
+            mem::forget(mem::replace(&mut self.next_token, Some(self.parser.next()?)));
+        }
+        unsafe {
+            Ok(&self.next_token.as_ref().unwrap_unchecked().0)
+        }
     }
 
     pub(crate) fn next(&mut self) -> ParserResult<Event> {
-        todo!()
+        self.last_mark = self.mark;
+        if let Some((e, mark)) = self.next_token.take() {
+            self.mark = Some(mark);
+            Ok(e)
+        } else {
+            let (e, mark) = self.parser.next()?;
+            self.mark = Some(mark);
+            Ok(e)
+        }
     }
 
     pub(crate) fn next_scalar(
@@ -232,18 +188,24 @@ impl<'a> Context<'a> {
         }
     }
 
-    // write until last token. including current token with margin
-    pub(crate) fn write_until_last_token(&mut self) {
-        trace!("write_until_last_token");
-        self.result
-            .push_str(&self.yaml[self.printed..self.last_mark.begin().index()]);
-        self.printed = self.last_mark.begin().index();
+    pub(crate) fn write_until_current_token_pre(&mut self) -> ParserResult {
+        trace!("write_until_current_token_pre");
+        self.append(self.mark.unwrap().begin().index());
+        Ok(())
     }
 
     // write until current token. including current token with margin
-    pub(crate) fn write_until_current_token(&mut self) {
+    pub(crate) fn write_until_current_token(&mut self) -> ParserResult {
         trace!("write_until_current_token");
-        self.copy_disabled_next = true;
+        self.peek()?;
+        self.append(self.next_token.as_ref().unwrap().1.begin().index());
+        Ok(())
+    }
+
+    pub(crate) fn skip_until_current_token_pre(&mut self) -> ParserResult {
+        trace!("skip_until_current_token_pre");
+        self.printed = self.mark.unwrap().end().index();
+        Ok(())
     }
 
     pub(crate) fn append_str(&mut self, str: &str) {
@@ -251,45 +213,27 @@ impl<'a> Context<'a> {
         self.result.push_str(str);
     }
 
-    // skip until last token. skip including last token but excludes margin
-    pub(crate) fn skip_until_last_token(&mut self) {
-        trace!("skip_until_last_token");
-        self.printed = self.last_mark.end().index();
+    fn append(&mut self, index: usize) {
+        self.result.push_str(&self.yaml[self.printed..index]);
+        self.printed = index;
     }
 
     pub(crate) fn finish(mut self) -> String {
         self.result.push_str(&self.yaml[self.printed..]);
         self.result
     }
-
-    #[allow(dead_code)]
-    pub(crate) fn reference(&mut self) -> ObjectReference {
-        *self
-            .inter_state
-            .take()
-            .and_then(|x| x.downcast().ok())
-            .expect("ObjectReference not parsed")
-    }
-
-    pub(crate) fn bool(&mut self) -> bool {
-        *self
-            .inter_state
-            .take()
-            .and_then(|x| x.downcast().ok())
-            .expect("ObjectReference not parsed")
-    }
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
 struct ObjectReference {
-    file_id: u64,
+    file_id: i64,
     guid: Option<String>,
     obj_type: u32,
 }
 
 impl ObjectReference {
     #[allow(dead_code)]
-    pub fn new(file_id: u64, guid: String, obj_type: u32) -> Self {
+    pub fn new(file_id: i64, guid: String, obj_type: u32) -> Self {
         Self {
             file_id,
             guid: Some(guid),
@@ -298,7 +242,7 @@ impl ObjectReference {
     }
 
     #[allow(dead_code)]
-    pub fn local(file_id: u64, obj_type: u32) -> Self {
+    pub fn local(file_id: i64, obj_type: u32) -> Self {
         Self {
             file_id,
             guid: None,
@@ -320,66 +264,6 @@ impl ObjectReference {
     }
 }
 
-trait StringOrStr {
-    fn to_string(self) -> String;
-}
-
-impl StringOrStr for String {
-    fn to_string(self) -> String {
-        self
-    }
-}
-
-impl StringOrStr for &str {
-    fn to_string(self) -> String {
-        self.to_owned()
-    }
-}
-
-trait EventReceiver: Debug {
-    fn on_event(self: Box<Self>, _ctx: &mut Context, ev: &Event) -> ReceiveResult;
-}
-
-enum ReceiveResult {
-    /// swaps current state with
-    Next(Box<dyn EventReceiver>),
-    /// swaps current state with first and pushes second state
-    NextAndPush(Box<dyn EventReceiver>, Box<dyn EventReceiver>),
-
-    /// same as Next but do current event will be used to call next state
-    NextWithSame(Box<dyn EventReceiver>),
-    /// same as NextAndPush but do current event will be used to call next state
-    NextAndPushWithSame(Box<dyn EventReceiver>, Box<dyn EventReceiver>),
-
-    PopState,
-}
-
-fn next(state: impl EventReceiver + 'static) -> ReceiveResult {
-    ReceiveResult::Next(Box::new(state))
-}
-
-fn next_and_push(
-    next: impl EventReceiver + 'static,
-    push: impl EventReceiver + 'static,
-) -> ReceiveResult {
-    ReceiveResult::NextAndPush(Box::new(next), Box::new(push))
-}
-
-fn next_with_same(state: impl EventReceiver + 'static) -> ReceiveResult {
-    ReceiveResult::NextWithSame(Box::new(state))
-}
-
-fn next_and_push_with_same(
-    next: impl EventReceiver + 'static,
-    push: impl EventReceiver + 'static,
-) -> ReceiveResult {
-    ReceiveResult::NextAndPushWithSame(Box::new(next), Box::new(push))
-}
-
-fn pop_state() -> ReceiveResult {
-    ReceiveResult::PopState
-}
-
 /// MonoBehaviour
 fn mono_behaviour(ctx: &mut Context) -> ParserResult {
     assert!(matches!(ctx.next()?, MappingStart(_)));
@@ -395,10 +279,10 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
                 {
                     // for serializedUdonProgramAsset or serializedProgramAsset with mapping,
                     // this tool assume the value as reference to SerializedUdonPrograms/<guid>.asset
-                    ctx.write_until_current_token();
+                    ctx.write_until_current_token()?;
                     skip_next_value(ctx)?;
                     ctx.append_str("{fileID: 0}");
-                    ctx.skip_until_last_token();
+                    ctx.skip_until_current_token_pre()?;
                 }
                 _ => skip_next_value(ctx)?,
             },
@@ -442,7 +326,7 @@ fn prefab_instance_modification(ctx: &mut Context) -> ParserResult {
 }
 
 fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
-    ctx.write_until_current_token();
+    ctx.write_until_current_token()?;
 
     assert!(matches!(ctx.next()?, SequenceStart(_)));
     while let MappingStart(_) = ctx.peek()? {
@@ -474,8 +358,8 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
                 object_reference.expect("objectReference not specified in prefab modifications");
 
             match property_path.as_str() {
-                "serializedProgramAsset" if value.is_empty() => ctx.skip_until_last_token(),
-                _ => ctx.write_until_last_token(),
+                "serializedProgramAsset" if value == "~" => ctx.skip_until_current_token_pre()?,
+                _ => ctx.write_until_current_token_pre()?,
             }
         }
     }
@@ -517,7 +401,7 @@ fn skip_next_value(ctx: &mut Context) -> ParserResult {
 
 fn parse_object_reference(ctx: &mut Context) -> ParserResult<ObjectReference> {
     assert!(matches!(ctx.next()?, MappingStart(_)));
-    let mut file_id: Option<u64> = None;
+    let mut file_id: Option<i64> = None;
     let mut guid: Option<String> = None;
     let mut object_type: Option<u32> = None;
     loop {
