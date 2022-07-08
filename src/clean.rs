@@ -964,4 +964,34 @@ mod test {
         );
         Ok(())
     }
+
+    #[test]
+    fn prefab_without_any_modification() -> anyhow::Result<()> {
+        // TODO
+        assert_eq!(
+            App::parse_one(concat!(
+            "--- !u!1001 &8809592113139104831\n",
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications: []\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+            ))?,
+            concat!(
+            "--- !u!1001 &8809592113139104831\n",
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications: []\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+            )
+        );
+        Ok(())
+    }
 }
