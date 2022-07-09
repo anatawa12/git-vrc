@@ -61,6 +61,7 @@ impl App {
         match object_type.as_str() {
             "MonoBehaviour" => mono_behaviour(&mut ctx)?,
             "PrefabInstance" => prefab_instance(&mut ctx)?,
+            "RenderSettings" => render_settings(&mut ctx)?,
             _ => {
                 // nothing to do fot this object. print all and return
                 return Ok(yaml.into());
@@ -278,6 +279,25 @@ fn should_omit(property_path: &str, value: &str, object_reference: &ObjectRefere
         return true;
     }
     return false;
+}
+
+/// RenderSettings
+fn render_settings(ctx: &mut Context) -> ParserResult {
+    ctx.mapping(|ctx| {
+        let name = ctx.next_scalar()?.0;
+        expect_token!(ctx.next()?, Value);
+        match name.as_str() {
+            "m_IndirectSpecularColor" => {
+                // for m_IndirectSpecularColor of m_IndirectSpecularColor,
+                ctx.write_until_current_token()?;
+                ctx.skip_next_value()?;
+                ctx.append_str(" {r: 0, g: 0, b: 0, a: 1}");
+                ctx.skip_until_current_token()?;
+            }
+            _ => ctx.skip_next_value()?,
+        }
+        Ok(())
+    })
 }
 
 #[cfg(test)]
@@ -696,6 +716,81 @@ mod test_dynamic_materials_and_prefab {
             "    m_Modifications: []\n",
             "    m_RemovedComponents: []\n",
             "  m_SourcePrefab: {fileID: 100100000, guid: 8894fa7e4588a5c4fab98453e558847d, type: 3}\n",
+            ),
+        );
+        Ok(())
+    }
+}
+
+mod test_render_settings {
+    use super::*;
+    // see https://github.com/anatawa12/git-vrc/issues/5
+
+    #[test]
+    fn mono_behaviour() -> anyhow::Result<()> {
+        assert_eq!(
+            App::parse_one(concat!(
+            "RenderSettings:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 9\n",
+            "  m_Fog: 0\n",
+            "  m_FogColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_FogMode: 3\n",
+            "  m_FogDensity: 0.01\n",
+            "  m_LinearFogStart: 0\n",
+            "  m_LinearFogEnd: 300\n",
+            "  m_AmbientSkyColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_AmbientEquatorColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_AmbientGroundColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_AmbientIntensity: 1\n",
+            "  m_AmbientMode: 0\n",
+            "  m_SubtractiveShadowColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}\n",
+            "  m_HaloStrength: 0.5\n",
+            "  m_FlareStrength: 1\n",
+            "  m_FlareFadeSpeed: 3\n",
+            "  m_HaloTexture: {fileID: 0}\n",
+            "  m_SpotCookie: {fileID: 10001, guid: 0000000000000000e000000000000000, type: 0}\n",
+            "  m_DefaultReflectionMode: 0\n",
+            "  m_DefaultReflectionResolution: 128\n",
+            "  m_ReflectionBounces: 1\n",
+            "  m_ReflectionIntensity: 1\n",
+            "  m_CustomReflection: {fileID: 0}\n",
+            "  m_Sun: {fileID: 0}\n",
+            "  m_IndirectSpecularColor: {r: 0.18028305, g: 0.22571313, b: 0.3069213, a: 1}\n",
+            "  m_UseRadianceAmbientProbe: 0\n",
+            // many fields omitted
+            ))?,
+            concat!(
+            "RenderSettings:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 9\n",
+            "  m_Fog: 0\n",
+            "  m_FogColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_FogMode: 3\n",
+            "  m_FogDensity: 0.01\n",
+            "  m_LinearFogStart: 0\n",
+            "  m_LinearFogEnd: 300\n",
+            "  m_AmbientSkyColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_AmbientEquatorColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_AmbientGroundColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_AmbientIntensity: 1\n",
+            "  m_AmbientMode: 0\n",
+            "  m_SubtractiveShadowColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}\n",
+            "  m_HaloStrength: 0.5\n",
+            "  m_FlareStrength: 1\n",
+            "  m_FlareFadeSpeed: 3\n",
+            "  m_HaloTexture: {fileID: 0}\n",
+            "  m_SpotCookie: {fileID: 10001, guid: 0000000000000000e000000000000000, type: 0}\n",
+            "  m_DefaultReflectionMode: 0\n",
+            "  m_DefaultReflectionResolution: 128\n",
+            "  m_ReflectionBounces: 1\n",
+            "  m_ReflectionIntensity: 1\n",
+            "  m_CustomReflection: {fileID: 0}\n",
+            "  m_Sun: {fileID: 0}\n",
+            "  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}\n",
+            "  m_UseRadianceAmbientProbe: 0\n",
             ),
         );
         Ok(())
