@@ -196,43 +196,39 @@ impl<'a> Context<'a> {
         }
     }
 
-    // write until current token. including current token with margin
+    // write until current token. including current token but not with suffix
     pub(crate) fn write_until_current_token(&mut self) -> ParserResult {
         trace!("write_until_current_token");
-        self.peek()?;
-        self.append(self.next_token.as_ref().unwrap().0.begin().index());
-        Ok(())
-    }
-
-    pub(crate) fn write_until_current_token0(&mut self) -> ParserResult {
-        trace!("write_until_current_token0");
-        self.append(self.mark.unwrap().end().index());
+        self.append(self.mark_pos(self.mark.unwrap()));
         Ok(())
     }
 
     pub(crate) fn write_until_last_token(&mut self) -> ParserResult {
-        trace!("write_until_current_token_pre");
-        self.append(self.last_mark.unwrap().end().index());
+        trace!("write_until_last_token");
+        self.append(self.mark_pos(self.last_mark.unwrap()));
         Ok(())
     }
 
     pub(crate) fn skip_until_last_token(&mut self) -> ParserResult {
         trace!("skip_until_last_token");
-        self.printed = self.last_mark.unwrap().end().index();
+        self.printed = self.mark_pos(self.last_mark.unwrap());
         Ok(())
     }
 
     pub(crate) fn skip_until_current_token(&mut self) -> ParserResult {
         trace!("skip_until_current_token");
-        let mark = self.mark.unwrap();
+        self.printed = self.mark_pos(self.mark.unwrap());
+        Ok(())
+    }
+
+    fn mark_pos(&self, mark: Marker) -> usize {
         if mark.begin().index() == mark.end().index() {
-            // it's position tokentrim
-            self.printed = self.yaml[..mark.begin().index()].trim_end().len()
+            // it's position token
+            self.yaml[..mark.begin().index()].trim_end().len()
         } else {
             // it's a token
-            self.printed = self.mark.unwrap().end().index();
+            mark.end().index()
         }
-        Ok(())
     }
 
     pub(crate) fn append_str(&mut self, str: &str) {

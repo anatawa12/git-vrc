@@ -163,7 +163,7 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
                 // this tool assume the value as reference to SerializedUdonPrograms/<guid>.asset
                 ctx.write_until_current_token()?;
                 ctx.skip_next_value()?;
-                ctx.append_str("{fileID: 0}");
+                ctx.append_str(" {fileID: 0}");
                 ctx.skip_until_current_token()?;
             }
             "DynamicMaterials" | "DynamicPrefabs" => {
@@ -171,7 +171,7 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
                 // (VRC_WorldDescriptor) is runtime (build-time) generated field so
                 // it should not be tracked via git
                 // https://github.com/anatawa12/git-vrc/issues/5
-                ctx.write_until_current_token0()?;
+                ctx.write_until_current_token()?;
                 ctx.append_str(" []");
                 ctx.skip_next_value()?;
                 ctx.skip_until_current_token()?;
@@ -211,7 +211,7 @@ fn prefab_instance_modification(ctx: &mut Context) -> ParserResult {
 }
 
 fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
-    ctx.write_until_current_token0()?;
+    ctx.write_until_current_token()?;
 
     let mut some_written = false;
 
