@@ -141,6 +141,88 @@ impl<'a> Context<'a> {
             e => unexpected_token!(e),
         }
     }
+
+    pub(crate) fn next_scalar(&mut self) -> ParserResult<(String, TScalarStyle)> {
+        match self.peek()? {
+            BlockEnd | FlowMappingEnd | Key | Value => {
+                return Ok(("~".to_owned(), TScalarStyle::Plain))
+            }
+            Scalar(_, _) => {
+                if let Scalar(style, value) = self.next()? {
+                    Ok((value, style))
+                } else {
+                    unreachable!()
+                }
+            }
+            e => panic!("scalar expected but was: {:?}", e),
+        }
+    }
+
+    pub(crate) fn skip_next_value(&mut self) -> ParserResult {
+        loop {
+            return match self.peek()? {
+                BlockEnd | FlowMappingEnd | Key | Value => return Ok(()),
+                BlockMappingStart | FlowMappingStart => self.mapping(|ctx| {
+                    ctx.skip_next_value()?;
+                    expect_token!(ctx.next()?, Value);
+                    ctx.skip_next_value()?;
+                    Ok(())
+                }),
+
+                BlockEntry => Ok(while let BlockEntry = self.peek()? {
+                    self.next()?;
+                    self.skip_next_value()?;
+                }),
+
+                FlowSequenceStart => {
+                    self.next()?;
+                    expect_token!(self.next()?, FlowSequenceEnd);
+                    Ok(())
+                }
+
+                Scalar(_, _) => {
+                    self.next()?;
+                    Ok(())
+                }
+
+                e => unexpected_token!(e),
+            };
+        }
+    }
+
+    pub(crate) fn parse_object_reference(&mut self) -> ParserResult<ObjectReference> {
+        let mut file_id: Option<i64> = None;
+        let mut guid: Option<String> = None;
+        let mut object_type: Option<u32> = None;
+
+        self.mapping(|ctx| {
+            let name = ctx.next_scalar()?.0;
+            expect_token!(ctx.next()?, Value);
+            match name.as_str() {
+                "fileID" => file_id = Some(ctx.next_scalar()?.0.parse().unwrap()),
+                "guid" => guid = Some(ctx.next_scalar()?.0),
+                "type" => object_type = Some(ctx.next_scalar()?.0.parse().unwrap()),
+                unknown => panic!("unknown key for object reference: {}", unknown),
+            }
+            Ok(())
+        })?;
+
+        let file_id = file_id.expect("fileID does not exist");
+        if file_id == 0 {
+            Ok(ObjectReference::null())
+        } else if let Some(guid) = guid {
+            Ok(ObjectReference::new(
+                file_id,
+                guid,
+                object_type.expect("type does not exist"),
+            ))
+        } else {
+            Ok(ObjectReference::local(
+                file_id,
+                object_type.expect("type does not exist"),
+            ))
+        }
+    }
 }
 
 type ParserResult<T = ()> = Result<T, ParserErr>;
@@ -212,22 +294,6 @@ impl<'a> Context<'a> {
             self.mark = Some(token.0);
             trace!("{:?}", token);
             Ok(token.1)
-        }
-    }
-
-    pub(crate) fn next_scalar(&mut self) -> ParserResult<(String, TScalarStyle)> {
-        match self.peek()? {
-            BlockEnd | FlowMappingEnd | Key | Value => {
-                return Ok(("~".to_owned(), TScalarStyle::Plain))
-            }
-            Scalar(_, _) => {
-                if let Scalar(style, value) = self.next()? {
-                    Ok((value, style))
-                } else {
-                    unreachable!()
-                }
-            }
-            e => panic!("scalar expected but was: {:?}", e),
         }
     }
 
@@ -340,11 +406,11 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
                 // for serializedUdonProgramAsset or serializedProgramAsset with mapping,
                 // this tool assume the value as reference to SerializedUdonPrograms/<guid>.asset
                 ctx.write_until_current_token()?;
-                skip_next_value(ctx)?;
+                ctx.skip_next_value()?;
                 ctx.append_str("{fileID: 0}");
                 ctx.skip_until_current_token()?;
             }
-            _ => skip_next_value(ctx)?,
+            _ => ctx.skip_next_value()?,
         }
         Ok(())
     })
@@ -360,7 +426,7 @@ fn prefab_instance(ctx: &mut Context) -> ParserResult {
                 assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
             }
             "m_Modification" => prefab_instance_modification(ctx)?,
-            _ => skip_next_value(ctx)?,
+            _ => ctx.skip_next_value()?,
         }
         Ok(())
     })
@@ -372,7 +438,7 @@ fn prefab_instance_modification(ctx: &mut Context) -> ParserResult {
         expect_token!(ctx.next()?, Value);
         match key.as_str() {
             "m_Modifications" => prefab_instance_modifications_sequence(ctx)?,
-            _ => skip_next_value(ctx)?,
+            _ => ctx.skip_next_value()?,
         }
         Ok(())
     })
@@ -394,10 +460,10 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
             expect_token!(ctx.next()?, Value);
 
             match key.as_str() {
-                "target" => target = Some(parse_object_reference(ctx)?),
+                "target" => target = Some(ctx.parse_object_reference()?),
                 "propertyPath" => property_path = Some(ctx.next_scalar()?.0),
                 "value" => value = Some(ctx.next_scalar()?.0),
-                "objectReference" => object_reference = Some(parse_object_reference(ctx)?),
+                "objectReference" => object_reference = Some(ctx.parse_object_reference()?),
                 unknown => panic!("unknown key on PrefabInstance modifications: {}", unknown),
             }
 
@@ -433,75 +499,6 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
 
     Ok(())
 }
-
-// region utilities
-
-fn skip_next_value(ctx: &mut Context) -> ParserResult {
-    loop {
-        return match ctx.peek()? {
-            BlockEnd | FlowMappingEnd | Key | Value => return Ok(()),
-            BlockMappingStart | FlowMappingStart => ctx.mapping(|ctx| {
-                skip_next_value(ctx)?;
-                expect_token!(ctx.next()?, Value);
-                skip_next_value(ctx)?;
-                Ok(())
-            }),
-
-            BlockEntry => Ok(while let BlockEntry = ctx.peek()? {
-                ctx.next()?;
-                skip_next_value(ctx)?;
-            }),
-
-            FlowSequenceStart => {
-                ctx.next()?;
-                expect_token!(ctx.next()?, FlowSequenceEnd);
-                Ok(())
-            }
-
-            Scalar(_, _) => {
-                ctx.next()?;
-                Ok(())
-            }
-
-            e => unexpected_token!(e),
-        };
-    }
-}
-
-fn parse_object_reference(ctx: &mut Context) -> ParserResult<ObjectReference> {
-    let mut file_id: Option<i64> = None;
-    let mut guid: Option<String> = None;
-    let mut object_type: Option<u32> = None;
-
-    ctx.mapping(|ctx| {
-        let name = ctx.next_scalar()?.0;
-        expect_token!(ctx.next()?, Value);
-        match name.as_str() {
-            "fileID" => file_id = Some(ctx.next_scalar()?.0.parse().unwrap()),
-            "guid" => guid = Some(ctx.next_scalar()?.0),
-            "type" => object_type = Some(ctx.next_scalar()?.0.parse().unwrap()),
-            unknown => panic!("unknown key for object reference: {}", unknown),
-        }
-        Ok(())
-    })?;
-
-    let file_id = file_id.expect("fileID does not exist");
-    if file_id == 0 {
-        Ok(ObjectReference::null())
-    } else if let Some(guid) = guid {
-        Ok(ObjectReference::new(
-            file_id,
-            guid,
-            object_type.expect("type does not exist"),
-        ))
-    } else {
-        Ok(ObjectReference::local(
-            file_id,
-            object_type.expect("type does not exist"),
-        ))
-    }
-}
-// endregion
 
 #[cfg(test)]
 mod test {
