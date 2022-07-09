@@ -1,16 +1,35 @@
+use crate::clean::ParserErr::EOF;
 use log::trace;
 use std::borrow::Cow;
-use std::fmt::Debug;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 use std::io::stdin;
 use std::io::Read;
 use std::mem;
-use yaml_rust::parser::*;
 use yaml_rust::scanner::*;
-use Event::*;
+use TokenType::*;
 
 #[derive(clap::Parser)]
 /// clean file.
 pub(crate) struct App {}
+
+macro_rules! expect_token {
+    ($token: expr, $($expect: tt)*) => {
+        match $token {
+            $($expect)* => {}
+            e => unexpected_token!(e, stringify!($($expect)*)),
+        }
+    };
+}
+
+macro_rules! unexpected_token {
+    ($token: expr) => {
+        panic!("unexpected token: {:?}", $token)
+    };
+    ($token: expr, $expected: expr) => {
+        panic!("expected {} but was {:?}", $expected, $token)
+    };
+}
 
 impl App {
     pub(crate) fn run(self) -> anyhow::Result<()> {
@@ -32,20 +51,11 @@ impl App {
     fn parse_one(yaml: &str) -> anyhow::Result<Cow<str>> {
         let mut ctx = Context::new(&yaml);
 
-        assert!(
-            matches!(ctx.next()?, StreamStart),
-            "StreamStart expected"
-        );
-        assert!(
-            matches!(ctx.next()?, DocumentStart),
-            "DocumentStart expected"
-        );
-        assert!(
-            matches!(ctx.next()?, MappingStart(_)),
-            "MappingStart expected"
-        );
-        let (object_type, _, _, _) = ctx.next_scalar()?;
-
+        expect_token!(ctx.next()?, StreamStart(_));
+        expect_token!(ctx.next()?, BlockMappingStart);
+        expect_token!(ctx.next()?, Key);
+        let object_type = ctx.next_scalar()?.0;
+        expect_token!(ctx.next()?, Value);
         match object_type.as_str() {
             "MonoBehaviour" => mono_behaviour(&mut ctx)?,
             "PrefabInstance" => prefab_instance(&mut ctx)?,
@@ -56,15 +66,8 @@ impl App {
         };
 
         // closings
-        assert!(matches!(ctx.next()?, MappingEnd), "MappingEnd expected");
-        assert!(
-            matches!(ctx.next()?, DocumentEnd),
-            "DocumentEnd expected"
-        );
-        assert!(
-            matches!(ctx.next()?, StreamEnd),
-            "StreamEnd expected"
-        );
+        assert!(matches!(ctx.next()?, BlockEnd), "MappingEnd expected");
+        assert!(matches!(ctx.next()?, StreamEnd), "StreamEnd expected");
 
         Ok(ctx.finish().into())
     }
@@ -132,21 +135,111 @@ impl<'a> Iterator for YamlSeparated<'a> {
 struct Context<'a> {
     printed: usize,
     yaml: &'a str,
-    parser: crate::yaml::YamlParser<'a>,
+    scanner: Scanner<std::str::Chars<'a>>,
     last_mark: Option<Marker>,
     mark: Option<Marker>,
-    next_token: Option<(Event, Marker)>,
+    next_token: Option<Token>,
     result: String,
 }
 
-type ParserResult<T = ()> = Result<T, ScanError>;
+impl<'a> Context<'a> {
+    pub(crate) fn mapping<'b>(
+        &'b mut self,
+        mut block: impl FnMut(&mut Context<'a>) -> ParserResult,
+    ) -> ParserResult {
+        match self.next()? {
+            BlockMappingStart => loop {
+                match self.next()? {
+                    Key => block(self)?,
+                    BlockEnd => return Ok(()),
+                    e => unexpected_token!(e),
+                }
+            },
+            FlowMappingStart => loop {
+                match self.next()? {
+                    Key => block(self)?,
+                    FlowMappingEnd => return Ok(()),
+                    e => unexpected_token!(e),
+                }
+                match self.next()? {
+                    FlowEntry => {}
+                    FlowMappingEnd => return Ok(()),
+                    e => unexpected_token!(e),
+                }
+            },
+            e => unexpected_token!(e),
+        }
+    }
+
+    pub(crate) fn sequence<'b>(
+        &'b mut self,
+        mut block: impl FnMut(&mut Context<'a>) -> ParserResult,
+    ) -> ParserResult {
+        match self.next()? {
+            BlockEntry => {
+                block(self)?;
+                while let BlockEntry = self.peek()? {
+                    self.next()?;
+                    block(self)?;
+                }
+                return Ok(());
+            }
+            FlowSequenceStart => loop {
+                if let FlowSequenceEnd = self.peek()? {
+                    self.next()?;
+                    return Ok(());
+                }
+                block(self)?;
+                match self.next()? {
+                    FlowEntry => {}
+                    FlowSequenceEnd => return Ok(()),
+                    e => unexpected_token!(e),
+                }
+            },
+            e => unexpected_token!(e),
+        }
+    }
+}
+
+type ParserResult<T = ()> = Result<T, ParserErr>;
+
+enum ParserErr {
+    Scan(ScanError),
+    EOF,
+}
+
+impl Debug for ParserErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserErr::Scan(e) => Debug::fmt(e, f),
+            EOF => f.write_str("EOF"),
+        }
+    }
+}
+
+impl Display for ParserErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserErr::Scan(e) => Display::fmt(e, f),
+            EOF => f.write_str("EOF"),
+        }
+    }
+}
+
+impl Error for ParserErr {}
+
+impl From<ScanError> for ParserErr {
+    fn from(e: ScanError) -> Self {
+        Self::Scan(e)
+    }
+}
 
 impl<'a> Context<'a> {
     pub(crate) fn new(yaml: &'a str) -> Self {
         Self {
             printed: 0,
             yaml,
-            parser: crate::yaml::YamlParser::new(yaml),
+            scanner: Scanner::new(yaml.chars()),
             last_mark: None,
             mark: None,
             next_token: None,
@@ -154,36 +247,44 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn peek(&mut self) -> ParserResult<&Event> {
+    pub(crate) fn peek(&mut self) -> ParserResult<&TokenType> {
         // because get_or_insert_with cannot return result,
         // this reimplement get_or_insert_with.
         if matches!(self.next_token, None) {
-            mem::forget(mem::replace(&mut self.next_token, Some(self.parser.next()?)));
+            mem::forget(mem::replace(
+                &mut self.next_token,
+                Some(self.scanner.next_token()?.ok_or(EOF)?),
+            ));
         }
-        unsafe {
-            Ok(&self.next_token.as_ref().unwrap_unchecked().0)
-        }
+        unsafe { Ok(&self.next_token.as_ref().unwrap_unchecked().1) }
     }
 
-    pub(crate) fn next(&mut self) -> ParserResult<Event> {
+    pub(crate) fn next(&mut self) -> ParserResult<TokenType> {
         self.last_mark = self.mark;
-        if let Some((e, mark)) = self.next_token.take() {
-            self.mark = Some(mark);
-            trace!("{:?}: {:?}", e, mark);
-            Ok(e)
+        if let Some(token) = self.next_token.take() {
+            self.mark = Some(token.0);
+            trace!("{:?}", token);
+            Ok(token.1)
         } else {
-            let (e, mark) = self.parser.next()?;
-            self.mark = Some(mark);
-            trace!("{:?}: {:?}", e, mark);
-            Ok(e)
+            let token = self.scanner.next_token()?.ok_or(EOF)?;
+            self.mark = Some(token.0);
+            trace!("{:?}", token);
+            Ok(token.1)
         }
     }
 
-    pub(crate) fn next_scalar(
-        &mut self,
-    ) -> ParserResult<(String, TScalarStyle, usize, Option<TokenType>)> {
-        match self.next()? {
-            Scalar(value, style, anchor_id, tag) => Ok((value, style, anchor_id, tag)),
+    pub(crate) fn next_scalar(&mut self) -> ParserResult<(String, TScalarStyle)> {
+        match self.peek()? {
+            BlockEnd | FlowMappingEnd | Key | Value => {
+                return Ok(("~".to_owned(), TScalarStyle::Plain))
+            }
+            Scalar(_, _) => {
+                if let Scalar(style, value) = self.next()? {
+                    Ok((value, style))
+                } else {
+                    unreachable!()
+                }
+            }
             e => panic!("scalar expected but was: {:?}", e),
         }
     }
@@ -192,7 +293,7 @@ impl<'a> Context<'a> {
     pub(crate) fn write_until_current_token(&mut self) -> ParserResult {
         trace!("write_until_current_token");
         self.peek()?;
-        self.append(self.next_token.as_ref().unwrap().1.begin().index());
+        self.append(self.next_token.as_ref().unwrap().0.begin().index());
         Ok(())
     }
 
@@ -216,7 +317,14 @@ impl<'a> Context<'a> {
 
     pub(crate) fn skip_until_current_token(&mut self) -> ParserResult {
         trace!("skip_until_current_token");
-        self.printed = self.mark.unwrap().end().index();
+        let mark = self.mark.unwrap();
+        if mark.begin().index() == mark.end().index() {
+            // it's position tokentrim
+            self.printed = self.yaml[..mark.begin().index()].trim_end().len()
+        } else {
+            // it's a token
+            self.printed = self.mark.unwrap().end().index();
+        }
         Ok(())
     }
 
@@ -271,6 +379,7 @@ impl ObjectReference {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_null(&self) -> bool {
         return self.file_id == 0;
     }
@@ -278,90 +387,80 @@ impl ObjectReference {
 
 /// MonoBehaviour
 fn mono_behaviour(ctx: &mut Context) -> ParserResult {
-    assert!(matches!(ctx.next()?, MappingStart(_)));
-    loop {
-        match ctx.next()? {
-            MappingEnd => return Ok(()),
-            Scalar(name, _, _, None) => match name.as_str() {
-                "serializedVersion" => {
-                    assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
-                }
-                "serializedUdonProgramAsset" | "serializedProgramAsset"
-                    if matches!(ctx.peek()?, MappingStart(_)) =>
-                {
-                    // for serializedUdonProgramAsset or serializedProgramAsset with mapping,
-                    // this tool assume the value as reference to SerializedUdonPrograms/<guid>.asset
-                    ctx.write_until_current_token()?;
-                    skip_next_value(ctx)?;
-                    ctx.append_str("{fileID: 0}");
-                    ctx.skip_until_current_token()?;
-                }
-                _ => skip_next_value(ctx)?,
-            },
-            // skip value
+    ctx.mapping(|ctx| {
+        let name = ctx.next_scalar()?.0;
+        expect_token!(ctx.next()?, Value);
+        match name.as_str() {
+            "serializedVersion" => {
+                assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
+            }
+            "serializedUdonProgramAsset" | "serializedProgramAsset" => {
+                // for serializedUdonProgramAsset or serializedProgramAsset with mapping,
+                // this tool assume the value as reference to SerializedUdonPrograms/<guid>.asset
+                ctx.write_until_current_token()?;
+                skip_next_value(ctx)?;
+                ctx.append_str("{fileID: 0}");
+                ctx.skip_until_current_token()?;
+            }
             _ => skip_next_value(ctx)?,
         }
-    }
+        Ok(())
+    })
 }
 
 /// PrefabInstance
 fn prefab_instance(ctx: &mut Context) -> ParserResult {
-    assert!(matches!(ctx.next()?, MappingStart(_)));
-    loop {
-        match ctx.next()? {
-            MappingEnd => return Ok(()),
-            Scalar(name, _, _, None) => match name.as_str() {
-                "serializedVersion" => {
-                    assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
-                }
-                "m_Modification" => prefab_instance_modification(ctx)?,
-                _ => skip_next_value(ctx)?,
-            },
-            // skip value
+    ctx.mapping(|ctx| {
+        let key = ctx.next_scalar()?.0;
+        expect_token!(ctx.next()?, Value);
+        match key.as_str() {
+            "serializedVersion" => {
+                assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
+            }
+            "m_Modification" => prefab_instance_modification(ctx)?,
             _ => skip_next_value(ctx)?,
         }
-    }
+        Ok(())
+    })
 }
 
 fn prefab_instance_modification(ctx: &mut Context) -> ParserResult {
-    assert!(matches!(ctx.next()?, MappingStart(_)));
-    loop {
-        match ctx.next()? {
-            MappingEnd => return Ok(()),
-            Scalar(name, _, _, None) if name == "m_Modifications" => {
-                prefab_instance_modifications_sequence(ctx)?
-            }
-            // skip value
+    ctx.mapping(|ctx| {
+        let key = ctx.next_scalar()?.0;
+        expect_token!(ctx.next()?, Value);
+        match key.as_str() {
+            "m_Modifications" => prefab_instance_modifications_sequence(ctx)?,
             _ => skip_next_value(ctx)?,
         }
-    }
+        Ok(())
+    })
 }
 
 fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
     ctx.write_until_current_token0()?;
-    ctx.append_str(":");
 
     let mut some_written = false;
-    assert!(matches!(ctx.next()?, SequenceStart(_)));
-    ctx.printed += 1;
 
-    while let MappingStart(_) = ctx.peek()? {
-        ctx.next()?;
+    ctx.sequence(|ctx| {
         let mut target: Option<ObjectReference> = None;
         let mut property_path: Option<String> = None;
         let mut value: Option<String> = None;
         let mut object_reference: Option<ObjectReference> = None;
-        while let Scalar(_, _, _, _) = ctx.peek()? {
-            let (name, _, _, _) = ctx.next_scalar()?;
-            match name.as_str() {
+
+        ctx.mapping(|ctx| {
+            let key = ctx.next_scalar()?.0;
+            expect_token!(ctx.next()?, Value);
+
+            match key.as_str() {
                 "target" => target = Some(parse_object_reference(ctx)?),
                 "propertyPath" => property_path = Some(ctx.next_scalar()?.0),
                 "value" => value = Some(ctx.next_scalar()?.0),
                 "objectReference" => object_reference = Some(parse_object_reference(ctx)?),
                 unknown => panic!("unknown key on PrefabInstance modifications: {}", unknown),
             }
-        }
-        assert!(matches!(ctx.next()?, MappingEnd));
+
+            Ok(())
+        })?;
 
         // check if current modification is for keep or remove
         #[allow(unused_variables)]
@@ -378,12 +477,12 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
                 _ => {
                     some_written = true;
                     ctx.write_until_last_token()?
-                },
+                }
             }
         }
-    }
-    ctx.printed = ctx.last_mark.unwrap().end().index();
-    assert!(matches!(ctx.next()?, SequenceEnd));
+
+        Ok(())
+    })?;
 
     if !some_written {
         ctx.skip_until_current_token()?;
@@ -396,60 +495,54 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
 // region utilities
 
 fn skip_next_value(ctx: &mut Context) -> ParserResult {
-    match ctx.next()? {
-        Nothing => unreachable!(),
-        StreamStart => unreachable!(),
-        StreamEnd => unreachable!(),
-        DocumentStart => unreachable!(),
-        DocumentEnd => unreachable!(),
-        Alias(_) => Ok(()),
-        Scalar(_, _, _, _) => Ok(()),
-        SequenceStart(_) => {
-            while !matches!(ctx.peek()?, SequenceEnd) {
+    loop {
+        return match ctx.peek()? {
+            BlockEnd | FlowMappingEnd | Key | Value => return Ok(()),
+            BlockMappingStart | FlowMappingStart => ctx.mapping(|ctx| {
                 skip_next_value(ctx)?;
+                expect_token!(ctx.next()?, Value);
+                skip_next_value(ctx)?;
+                Ok(())
+            }),
+
+            BlockEntry => Ok(while let BlockEntry = ctx.peek()? {
+                ctx.next()?;
+                skip_next_value(ctx)?;
+            }),
+
+            FlowSequenceStart => {
+                ctx.next()?;
+                expect_token!(ctx.next()?, FlowSequenceEnd);
+                Ok(())
             }
-            assert!(matches!(ctx.next()?, SequenceEnd));
-            Ok(())
-        }
-        SequenceEnd => unreachable!(),
-        MappingStart(_) => {
-            while !matches!(ctx.peek()?, MappingEnd) {
-                // key and value
-                skip_next_value(ctx)?;
-                skip_next_value(ctx)?;
+
+            Scalar(_, _) => {
+                ctx.next()?;
+                Ok(())
             }
-            assert!(matches!(ctx.next()?, MappingEnd));
-            Ok(())
-        }
-        MappingEnd => unreachable!(),
+
+            e => unexpected_token!(e),
+        };
     }
 }
 
 fn parse_object_reference(ctx: &mut Context) -> ParserResult<ObjectReference> {
-    assert!(matches!(ctx.next()?, MappingStart(_)));
     let mut file_id: Option<i64> = None;
     let mut guid: Option<String> = None;
     let mut object_type: Option<u32> = None;
-    loop {
-        match ctx.next()? {
-            Nothing => unreachable!(),
-            StreamStart => unreachable!(),
-            StreamEnd => unreachable!(),
-            DocumentStart => unreachable!(),
-            DocumentEnd => unreachable!(),
-            Alias(_) => unreachable!(),
-            Scalar(s, _, _, _) => match s.as_str() {
-                "fileID" => file_id = Some(ctx.next_scalar()?.0.parse().unwrap()),
-                "guid" => guid = Some(ctx.next_scalar()?.0),
-                "type" => object_type = Some(ctx.next_scalar()?.0.parse().unwrap()),
-                unknown => panic!("unknown key for object reference: {}", unknown),
-            },
-            SequenceStart(_) => unreachable!(),
-            SequenceEnd => unreachable!(),
-            MappingStart(_) => unreachable!(),
-            MappingEnd => break,
+
+    ctx.mapping(|ctx| {
+        let name = ctx.next_scalar()?.0;
+        expect_token!(ctx.next()?, Value);
+        match name.as_str() {
+            "fileID" => file_id = Some(ctx.next_scalar()?.0.parse().unwrap()),
+            "guid" => guid = Some(ctx.next_scalar()?.0),
+            "type" => object_type = Some(ctx.next_scalar()?.0.parse().unwrap()),
+            unknown => panic!("unknown key for object reference: {}", unknown),
         }
-    }
+        Ok(())
+    })?;
+
     let file_id = file_id.expect("fileID does not exist");
     if file_id == 0 {
         Ok(ObjectReference::null())
@@ -571,7 +664,6 @@ mod test {
         // TODO
         assert_eq!(
             App::parse_one(concat!(
-        "--- !u!1001 &8809592113139104831\n",
         "PrefabInstance:\n",
         "  m_ObjectHideFlags: 0\n",
         "  serializedVersion: 2\n",
@@ -593,7 +685,6 @@ mod test {
         "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
         ))?,
             concat!(
-        "--- !u!1001 &8809592113139104831\n",
         "PrefabInstance:\n",
         "  m_ObjectHideFlags: 0\n",
         "  serializedVersion: 2\n",
@@ -617,7 +708,6 @@ mod test {
         // TODO
         assert_eq!(
             App::parse_one(concat!(
-        "--- !u!1001 &8809592113139104831\n",
         "PrefabInstance:\n",
         "  m_ObjectHideFlags: 0\n",
         "  serializedVersion: 2\n",
@@ -639,7 +729,6 @@ mod test {
         "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
         ))?,
             concat!(
-        "--- !u!1001 &8809592113139104831\n",
         "PrefabInstance:\n",
         "  m_ObjectHideFlags: 0\n",
         "  serializedVersion: 2\n",
@@ -663,7 +752,6 @@ mod test {
         // TODO
         assert_eq!(
             App::parse_one(concat!(
-        "--- !u!1001 &8809592113139104831\n",
         "PrefabInstance:\n",
         "  m_ObjectHideFlags: 0\n",
         "  serializedVersion: 2\n",
@@ -680,7 +768,6 @@ mod test {
         "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
         ))?,
             concat!(
-        "--- !u!1001 &8809592113139104831\n",
         "PrefabInstance:\n",
         "  m_ObjectHideFlags: 0\n",
         "  serializedVersion: 2\n",
@@ -700,7 +787,6 @@ mod test {
         // TODO
         assert_eq!(
             App::parse_one(concat!(
-            "--- !u!1001 &8809592113139104831\n",
             "PrefabInstance:\n",
             "  m_ObjectHideFlags: 0\n",
             "  serializedVersion: 2\n",
@@ -711,7 +797,6 @@ mod test {
             "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
             ))?,
             concat!(
-            "--- !u!1001 &8809592113139104831\n",
             "PrefabInstance:\n",
             "  m_ObjectHideFlags: 0\n",
             "  serializedVersion: 2\n",
