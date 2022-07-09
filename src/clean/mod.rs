@@ -257,7 +257,7 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
 }
 
 #[cfg(test)]
-mod test {
+mod test_udon_program_asset {
     use super::*;
 
     #[test]
@@ -296,9 +296,13 @@ mod test {
         ));
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_udon_behaviour {
+    use super::*;
     #[test]
-    fn udon_behaviour() -> anyhow::Result<()> {
+    fn mono_behaviour() -> anyhow::Result<()> {
         assert_eq!(App::parse_one(concat!(
         "MonoBehaviour:\n",
         "  m_ObjectHideFlags: 2\n",
