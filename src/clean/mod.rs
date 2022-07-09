@@ -301,6 +301,7 @@ mod test_udon_program_asset {
 #[cfg(test)]
 mod test_udon_behaviour {
     use super::*;
+
     #[test]
     fn mono_behaviour() -> anyhow::Result<()> {
         assert_eq!(App::parse_one(concat!(
@@ -359,7 +360,46 @@ mod test_udon_behaviour {
     }
 
     #[test]
-    fn prefab_with_other_modification_at_heading() -> anyhow::Result<()> {
+    fn prefab() -> anyhow::Result<()> {
+        // TODO
+        assert_eq!(
+            App::parse_one(concat!(
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications:\n",
+            "    - target: {fileID: 9122363655180540528, guid: 26db88bf250934ccca835bd9318c0eeb,\n",
+            "        type: 3}\n",
+            "      propertyPath: serializedProgramAsset\n",
+            "      value:\n",
+            "      objectReference: {fileID: 11400000, guid: 7f6636ec3d2154e059e383d146a28a59,\n",
+            "        type: 2}\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+            ))?,
+            concat!(
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications: []\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
+            )
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_prefab_modifications {
+    use super::*;
+
+    #[test]
+    fn with_other_modification_at_heading() -> anyhow::Result<()> {
         // TODO
         assert_eq!(
             App::parse_one(concat!(
@@ -403,7 +443,7 @@ mod test_udon_behaviour {
     }
 
     #[test]
-    fn prefab_with_other_modification_at_last() -> anyhow::Result<()> {
+    fn with_other_modification_at_last() -> anyhow::Result<()> {
         // TODO
         assert_eq!(
             App::parse_one(concat!(
@@ -447,7 +487,7 @@ mod test_udon_behaviour {
     }
 
     #[test]
-    fn prefab_without_other_modification() -> anyhow::Result<()> {
+    fn without_other_modification() -> anyhow::Result<()> {
         // TODO
         assert_eq!(
             App::parse_one(concat!(
@@ -481,7 +521,7 @@ mod test_udon_behaviour {
     }
 
     #[test]
-    fn prefab_without_any_modification() -> anyhow::Result<()> {
+    fn without_any_modification() -> anyhow::Result<()> {
         simple_logger::init_with_level(log::Level::Trace)?;
         // TODO
         assert_eq!(
