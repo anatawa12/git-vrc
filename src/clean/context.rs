@@ -1,10 +1,10 @@
+use crate::clean::ParserErr::EOF;
+use crate::clean::{ObjectReference, ParserResult};
+use log::trace;
 use std::mem;
 use std::str::Chars;
-use log::trace;
-use yaml_rust::scanner::{Marker, Scanner, Token, TokenType, TScalarStyle};
 use yaml_rust::scanner::TokenType::*;
-use crate::clean::{ObjectReference, ParserResult};
-use crate::clean::ParserErr::EOF;
+use yaml_rust::scanner::{Marker, Scanner, TScalarStyle, Token, TokenType};
 
 pub(crate) struct Context<'a> {
     printed: usize,

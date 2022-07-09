@@ -1,4 +1,6 @@
+use crate::clean::context::Context;
 use crate::clean::ParserErr::EOF;
+use crate::yaml::YamlSeparated;
 use log::trace;
 use std::borrow::Cow;
 use std::error::Error;
@@ -7,8 +9,6 @@ use std::io::stdin;
 use std::io::Read;
 use yaml_rust::scanner::*;
 use TokenType::*;
-use crate::clean::context::Context;
-use crate::yaml::YamlSeparated;
 
 macro_rules! expect_token {
     ($token: expr, $($expect: tt)*) => {
