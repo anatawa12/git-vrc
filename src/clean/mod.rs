@@ -166,6 +166,16 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
                 ctx.append_str("{fileID: 0}");
                 ctx.skip_until_current_token()?;
             }
+            "DynamicMaterials" | "DynamicPrefabs" => {
+                // DynamicMaterials or DynamicPrefabs of -17141911:661092b4961be7145bfbe56e1e62337b
+                // (VRC_WorldDescriptor) is runtime (build-time) generated field so
+                // it should not be tracked via git
+                // https://github.com/anatawa12/git-vrc/issues/5
+                ctx.write_until_current_token0()?;
+                ctx.append_str(" []");
+                ctx.skip_next_value()?;
+                ctx.skip_until_current_token()?;
+            }
             _ => ctx.skip_next_value()?,
         }
         Ok(())
@@ -259,6 +269,12 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
 #[allow(unused_variables)]
 fn should_omit(property_path: &str, value: &str, object_reference: &ObjectReference) -> bool {
     if property_path == "serializedProgramAsset" && value == "~" {
+        return true;
+    }
+    if property_path.starts_with("DynamicMaterials.Array")
+        || property_path.starts_with("DynamicPrefabs.Array")
+    {
+        // https://github.com/anatawa12/git-vrc/issues/5
         return true;
     }
     return false;
@@ -553,6 +569,134 @@ mod test_prefab_modifications {
             "    m_RemovedComponents: []\n",
             "  m_SourcePrefab: {fileID: 100100000, guid: 26db88bf250934ccca835bd9318c0eeb, type: 3}\n",
             )
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_dynamic_materials_and_prefab {
+    use super::*;
+    // see https://github.com/anatawa12/git-vrc/issues/5
+
+    #[test]
+    fn mono_behaviour() -> anyhow::Result<()> {
+        assert_eq!(
+            App::parse_one(concat!(
+                "MonoBehaviour:\n",
+                // many fields omitted
+                "  useAssignedLayers: 0\n",
+                "  DynamicPrefabs: \n",
+                "  - {fileID: 2100000, guid: 3f13a5d1eb038764b804d1aabffed55f, type: 2}\n",
+                "  - {fileID: 2100000, guid: 48f32ce8d7140f045a2c568df3a8d9bd, type: 2}\n",
+                "  - {fileID: 2100000, guid: 09418b03dc9fc469f8d23aca7b180691, type: 2}\n",
+                "  - {fileID: 2100000, guid: 43d0ae848fdfe6d4495a87f8e80e386b, type: 2}\n",
+                "  - {fileID: 2100000, guid: c2af845bdfb561149b08ba13167ff040, type: 2}\n",
+                "  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}\n",
+                "  DynamicMaterials:\n",
+                "  - {fileID: 2100000, guid: 3f13a5d1eb038764b804d1aabffed55f, type: 2}\n",
+                "  - {fileID: 2100000, guid: 48f32ce8d7140f045a2c568df3a8d9bd, type: 2}\n",
+                "  - {fileID: 2100000, guid: 09418b03dc9fc469f8d23aca7b180691, type: 2}\n",
+                "  - {fileID: 2100000, guid: 43d0ae848fdfe6d4495a87f8e80e386b, type: 2}\n",
+                "  - {fileID: 2100000, guid: c2af845bdfb561149b08ba13167ff040, type: 2}\n",
+                "  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}\n",
+                "  - {fileID: 2100000, guid: a59b4d20f3b324ca1aae5fd4f3942cf3, type: 2}\n",
+                "  - {fileID: 2100000, guid: 9db9f48f3ee803d448488d4368a140f9, type: 2}\n",
+                "  - {fileID: 2100000, guid: dd75a5d3bd47a0c489c0fd71aff39ede, type: 2}\n",
+                "  - {fileID: 2100000, guid: 88aa935393607b6409baa45499f5156b, type: 2}\n",
+                "  - {fileID: 2100000, guid: a393dafb2990e2c4fa0628ace4444efa, type: 2}\n",
+                "  - {fileID: 2100000, guid: b24ed807dd7dc224baf5390f46738647, type: 2}\n",
+                "  - {fileID: 2100000, guid: 254a177cd9c57e84683d0fd3bd1be46d, type: 2}\n",
+                "  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}\n",
+                "  - {fileID: 2100000, guid: e01134920adbcf549ac7f52ceeb583a2, type: 2}\n",
+                "  - {fileID: 2100000, guid: 885a01c79ffd5024489a1fb31f3fffb5, type: 2}\n",
+                "  - {fileID: 2100000, guid: 87529c80faca0ef4a881efba652815f3, type: 2}\n",
+                "  - {fileID: 2100000, guid: 49c7ed6d767622b4fadcf200017fd44f, type: 2}\n",
+                "  - {fileID: 2100000, guid: e86e7281176dae945bd655f34805ed55, type: 2}\n",
+                "  - {fileID: 2100000, guid: 51d72acecdb1ba249957953415f8e29b, type: 2}\n",
+                "  - {fileID: 2100000, guid: 419ae9fed5372564c995339c60fd7ebf, type: 2}\n",
+                "  - {fileID: 2100000, guid: b3889ddf2a4bd9346a4843eb47e0acb1, type: 2}\n",
+                "  - {fileID: 2100000, guid: 56778de2f4060f14fb06bc8cba7e30b7, type: 2}\n",
+                "  - {fileID: 2100000, guid: 5b91c5c74862dba4d9fc2e8ae3e07b70, type: 2}\n",
+                "  LightMapsNear: []\n",
+                // many fields omitted
+            ))?,
+            concat!(
+                "MonoBehaviour:\n",
+                // many fields omitted
+                "  useAssignedLayers: 0\n",
+                "  DynamicPrefabs: []\n",
+                "  DynamicMaterials: []\n",
+                "  LightMapsNear: []\n",
+                // many fields omitted
+            ),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prefab() -> anyhow::Result<()> {
+        assert_eq!(
+            App::parse_one(concat!(
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications:\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicMaterials.Array.size\n",
+            "      value: 3\n",
+            "      objectReference: {fileID: 0}\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicMaterials.Array.data[0]\n",
+            "      value: \n",
+            "      objectReference: {fileID: 2100000, guid: 3e749d8edb4501f488bf37401bec19cf, type: 2}\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicMaterials.Array.data[1]\n",
+            "      value: \n",
+            "      objectReference: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicMaterials.Array.data[2]\n",
+            "      value: \n",
+            "      objectReference: {fileID: 10308, guid: 0000000000000000f000000000000000, type: 0}\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicPrefabs.Array.size\n",
+            "      value: 3\n",
+            "      objectReference: {fileID: 0}\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicPrefabs.Array.data[0]\n",
+            "      value: \n",
+            "      objectReference: {fileID: 2100000, guid: 3e749d8edb4501f488bf37401bec19cf, type: 2}\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicPrefabs.Array.data[1]\n",
+            "      value: \n",
+            "      objectReference: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}\n",
+            "    - target: {fileID: 6759095419728963412, guid: 8894fa7e4588a5c4fab98453e558847d,\n",
+            "        type: 3}\n",
+            "      propertyPath: DynamicPrefabs.Array.data[2]\n",
+            "      value: \n",
+            "      objectReference: {fileID: 10308, guid: 0000000000000000f000000000000000, type: 0}\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 8894fa7e4588a5c4fab98453e558847d, type: 3}\n",
+            ))?,
+            concat!(
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications: []\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 8894fa7e4588a5c4fab98453e558847d, type: 3}\n",
+            ),
         );
         Ok(())
     }
