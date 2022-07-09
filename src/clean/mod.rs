@@ -236,12 +236,12 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
             let object_reference =
                 object_reference.expect("objectReference not specified in prefab modifications");
 
-            match property_path.as_str() {
-                "serializedProgramAsset" if value == "~" => ctx.skip_until_last_token()?,
-                _ => {
-                    some_written = true;
-                    ctx.write_until_last_token()?
-                }
+            if should_omit(&property_path, &value, &object_reference) {
+                // https://github.com/anatawa12/git-vrc/issues/5
+                ctx.skip_until_last_token()?
+            } else {
+                some_written = true;
+                ctx.write_until_last_token()?
             }
         }
 
@@ -254,6 +254,14 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
     }
 
     Ok(())
+}
+
+#[allow(unused_variables)]
+fn should_omit(property_path: &str, value: &str, object_reference: &ObjectReference) -> bool {
+    if property_path == "serializedProgramAsset" && value == "~" {
+        return true;
+    }
+    return false;
 }
 
 #[cfg(test)]
