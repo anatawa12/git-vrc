@@ -21,7 +21,6 @@ macro_rules! unexpected_token {
     };
 }
 
-mod context;
 mod filter;
 
 #[derive(clap::Parser)]
