@@ -1,7 +1,9 @@
-use crate::yaml::YamlSeparated;
+use crate::yaml::{ParsedHeadingLine, YamlSeparated};
 use log::trace;
+use std::borrow::Cow;
 use std::io::stdin;
 use std::io::Read;
+use std::str::FromStr;
 
 macro_rules! expect_token {
     ($token: expr, $($expect: tt)*) => {
@@ -35,17 +37,126 @@ impl App {
         let first = iter.next().unwrap();
         print!("{}{}", first.0, first.1);
 
-        while let Some((heading, body)) = iter.next() {
+        // filter phase
+        let mut sections = Vec::new();
+        for (heading, body) in iter {
             trace!("start: {}", heading);
             let filtered = filter::filter_yaml(body)?;
-            if !filtered.is_empty() {
-                print!("{}", heading);
-                print!("{}", filtered);
+            sections.push(YamlSection {
+                heading,
+                filtered,
+                parsed: ParsedHeadingLine::from_str(heading)?,
+            })
+        }
+
+        // optimization
+        optimize_yaml(&mut sections);
+
+        for sec in sections {
+            if !sec.filtered.is_empty() {
+                print!("{}{}", sec.heading, sec.filtered);
             }
         }
 
         Ok(())
     }
+}
+
+/// optimize yaml. remove unused stripped object
+fn optimize_yaml(sections: &mut [YamlSection]) {
+    for i in 0..sections.len() {
+        let sec = &mut sections[i];
+
+        if sec.parsed.is_stripped() {
+            let find = format!("{{fileID: {}}}", sec.parsed.file_id());
+            // find `{fileID: <file-id>}`
+
+            let mut found = false;
+            for j in 0..sections.len() {
+                if sections[j].filtered.contains(&find) {
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                sections[i].filtered = Cow::Borrowed("");
+            }
+        }
+    }
+}
+
+#[test]
+fn optimize_yaml_test() {
+    macro_rules! test {
+        ($expect: expr, $input: expr) => {{
+            let mut slice = $input;
+            optimize_yaml(&mut slice);
+            assert_eq!($expect, slice);
+        }};
+    }
+
+    // do not optimize if exists
+    test!(
+        [
+            YamlSection {
+                heading: "--- !u!114 &484105423 stripped",
+                parsed: ParsedHeadingLine::new(484105423, true),
+                filtered: Cow::Borrowed("MonoBehaviour:\n"),
+            },
+            YamlSection {
+                heading: "--- !u!114 &2087762956",
+                parsed: ParsedHeadingLine::new(2087762956, false),
+                filtered: Cow::Borrowed("MonoBehaviour:\n  script: {fileID: 484105423}\n"),
+            }
+        ],
+        [
+            YamlSection {
+                heading: "--- !u!114 &484105423 stripped",
+                parsed: ParsedHeadingLine::new(484105423, true),
+                filtered: Cow::Borrowed("MonoBehaviour:\n"),
+            },
+            YamlSection {
+                heading: "--- !u!114 &2087762956",
+                parsed: ParsedHeadingLine::new(2087762956, false),
+                filtered: Cow::Borrowed("MonoBehaviour:\n  script: {fileID: 484105423}\n"),
+            }
+        ]
+    );
+
+    // remove that if no reference found
+    test!(
+        [
+            YamlSection {
+                heading: "--- !u!114 &484105423 stripped",
+                parsed: ParsedHeadingLine::new(484105423, true),
+                filtered: Cow::Borrowed(""),
+            },
+            YamlSection {
+                heading: "--- !u!114 &2087762956",
+                parsed: ParsedHeadingLine::new(2087762956, false),
+                filtered: Cow::Borrowed("MonoBehaviour:\n"),
+            }
+        ],
+        [
+            YamlSection {
+                heading: "--- !u!114 &484105423 stripped",
+                parsed: ParsedHeadingLine::new(484105423, true),
+                filtered: Cow::Borrowed("MonoBehaviour:\n"),
+            },
+            YamlSection {
+                heading: "--- !u!114 &2087762956",
+                parsed: ParsedHeadingLine::new(2087762956, false),
+                filtered: Cow::Borrowed("MonoBehaviour:\n"),
+            }
+        ]
+    );
+}
+
+#[derive(Eq, PartialEq, Debug)]
+struct YamlSection<'a> {
+    heading: &'a str,
+    parsed: ParsedHeadingLine,
+    filtered: Cow<'a, str>,
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
