@@ -1,12 +1,48 @@
-use crate::clean::ParserErr::EOF;
-use crate::clean::{ObjectReference, ParserResult};
+use crate::clean::context::ParserErr::EOF;
+use crate::clean::ObjectReference;
 use log::trace;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::ops::ControlFlow;
 use std::str::Chars;
 use yaml_rust::scanner::TokenType::*;
 use yaml_rust::scanner::{Marker, Scanner, TScalarStyle, Token, TokenType};
+use yaml_rust::ScanError;
 use ControlFlow::Continue;
+
+pub(crate) type ParserResult<T = ()> = Result<T, ParserErr>;
+
+pub(crate) enum ParserErr {
+    Scan(ScanError),
+    EOF,
+}
+
+impl Debug for ParserErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserErr::Scan(e) => Debug::fmt(e, f),
+            EOF => f.write_str("EOF"),
+        }
+    }
+}
+
+impl Display for ParserErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserErr::Scan(e) => Display::fmt(e, f),
+            EOF => f.write_str("EOF"),
+        }
+    }
+}
+
+impl Error for ParserErr {}
+
+impl From<ScanError> for ParserErr {
+    fn from(e: ScanError) -> Self {
+        Self::Scan(e)
+    }
+}
 
 pub(crate) struct Context<'a> {
     printed: usize,
