@@ -2,9 +2,11 @@ use crate::clean::ParserErr::EOF;
 use crate::clean::{ObjectReference, ParserResult};
 use log::trace;
 use std::mem;
+use std::ops::ControlFlow;
 use std::str::Chars;
 use yaml_rust::scanner::TokenType::*;
 use yaml_rust::scanner::{Marker, Scanner, TScalarStyle, Token, TokenType};
+use ControlFlow::Continue;
 
 pub(crate) struct Context<'a> {
     printed: usize,
@@ -16,28 +18,37 @@ pub(crate) struct Context<'a> {
     result: String,
 }
 
+macro_rules! return_ok_if_break {
+    ($controlflow: expr) => {
+        match $controlflow {
+            ControlFlow::Break(v) => return Ok(v),
+            ControlFlow::Continue(()) => {}
+        }
+    };
+}
+
 impl<'a> Context<'a> {
-    pub(crate) fn mapping<'b>(
+    pub(crate) fn mapping<'b, R: Default>(
         &'b mut self,
-        mut block: impl FnMut(&mut Context<'a>) -> ParserResult,
-    ) -> ParserResult {
+        mut block: impl FnMut(&mut Context<'a>) -> ParserResult<ControlFlow<R>>,
+    ) -> ParserResult<R> {
         match self.next()? {
             BlockMappingStart => loop {
                 match self.next()? {
-                    Key => block(self)?,
-                    BlockEnd => return Ok(()),
+                    Key => return_ok_if_break!(block(self)?),
+                    BlockEnd => return Ok(R::default()),
                     e => unexpected_token!(e),
                 }
             },
             FlowMappingStart => loop {
                 match self.next()? {
-                    Key => block(self)?,
-                    FlowMappingEnd => return Ok(()),
+                    Key => return_ok_if_break!(block(self)?),
+                    FlowMappingEnd => return Ok(R::default()),
                     e => unexpected_token!(e),
                 }
                 match self.next()? {
                     FlowEntry => {}
-                    FlowMappingEnd => return Ok(()),
+                    FlowMappingEnd => return Ok(R::default()),
                     e => unexpected_token!(e),
                 }
             },
@@ -45,28 +56,28 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn sequence<'b>(
+    pub(crate) fn sequence<'b, R: Default>(
         &'b mut self,
-        mut block: impl FnMut(&mut Context<'a>) -> ParserResult,
-    ) -> ParserResult {
+        mut block: impl FnMut(&mut Context<'a>) -> ParserResult<ControlFlow<R>>,
+    ) -> ParserResult<R> {
         match self.next()? {
             BlockEntry => {
-                block(self)?;
+                return_ok_if_break!(block(self)?);
                 while let BlockEntry = self.peek()? {
                     self.next()?;
-                    block(self)?;
+                    return_ok_if_break!(block(self)?);
                 }
-                return Ok(());
+                return Ok(R::default());
             }
             FlowSequenceStart => loop {
                 if let FlowSequenceEnd = self.peek()? {
                     self.next()?;
-                    return Ok(());
+                    return Ok(R::default());
                 }
-                block(self)?;
+                return_ok_if_break!(block(self)?);
                 match self.next()? {
                     FlowEntry => {}
-                    FlowSequenceEnd => return Ok(()),
+                    FlowSequenceEnd => return Ok(R::default()),
                     e => unexpected_token!(e),
                 }
             },
@@ -98,7 +109,7 @@ impl<'a> Context<'a> {
                     ctx.skip_next_value()?;
                     expect_token!(ctx.next()?, Value);
                     ctx.skip_next_value()?;
-                    Ok(())
+                    Ok(Continue(()))
                 }),
 
                 BlockEntry => Ok(while let BlockEntry = self.peek()? {
@@ -136,7 +147,7 @@ impl<'a> Context<'a> {
                 "type" => object_type = Some(ctx.next_scalar()?.0.parse().unwrap()),
                 unknown => panic!("unknown key for object reference: {}", unknown),
             }
-            Ok(())
+            Ok(Continue(()))
         })?;
 
         let file_id = file_id.expect("fileID does not exist");

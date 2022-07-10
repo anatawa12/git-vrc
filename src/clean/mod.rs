@@ -7,6 +7,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::stdin;
 use std::io::Read;
+use std::ops::ControlFlow::Continue;
 use yaml_rust::scanner::*;
 use TokenType::*;
 
@@ -51,6 +52,7 @@ impl App {
     }
 
     fn parse_one(yaml: &str) -> anyhow::Result<Cow<str>> {
+        assert!(!yaml.is_empty());
         let mut ctx = Context::new(&yaml);
 
         expect_token!(ctx.next()?, StreamStart(_));
@@ -179,7 +181,7 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
             }
             _ => ctx.skip_next_value()?,
         }
-        Ok(())
+        Ok(Continue(()))
     })
 }
 
@@ -195,7 +197,7 @@ fn prefab_instance(ctx: &mut Context) -> ParserResult {
             "m_Modification" => prefab_instance_modification(ctx)?,
             _ => ctx.skip_next_value()?,
         }
-        Ok(())
+        Ok(Continue(()))
     })
 }
 
@@ -207,7 +209,7 @@ fn prefab_instance_modification(ctx: &mut Context) -> ParserResult {
             "m_Modifications" => prefab_instance_modifications_sequence(ctx)?,
             _ => ctx.skip_next_value()?,
         }
-        Ok(())
+        Ok(Continue(()))
     })
 }
 
@@ -234,7 +236,7 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
                 unknown => panic!("unknown key on PrefabInstance modifications: {}", unknown),
             }
 
-            Ok(())
+            Ok(Continue(()))
         })?;
 
         // check if current modification is for keep or remove
@@ -256,7 +258,7 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
             }
         }
 
-        Ok(())
+        Ok(Continue(()))
     })?;
 
     if !some_written {
@@ -296,7 +298,7 @@ fn render_settings(ctx: &mut Context) -> ParserResult {
             }
             _ => ctx.skip_next_value()?,
         }
-        Ok(())
+        Ok(Continue(()))
     })
 }
 
