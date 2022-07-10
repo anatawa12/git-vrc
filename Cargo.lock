@@ -130,6 +130,7 @@ dependencies = [
  "anyhow",
  "clap",
  "itertools",
+ "lazy_static",
  "log",
  "simple_logger",
  "yaml-rust",

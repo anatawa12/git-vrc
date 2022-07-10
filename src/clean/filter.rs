@@ -1,11 +1,12 @@
 use crate::clean::filter::ParserErr::EOF;
 use crate::clean::ObjectReference;
+use lazy_static::lazy_static;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::num::NonZeroUsize;
 use std::ops::ControlFlow;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
 use std::str::Chars;
 use yaml_rust::scanner::*;
 use TokenType::*;
@@ -356,6 +357,11 @@ pub(crate) fn filter_yaml(yaml: &str) -> ParserResult<Cow<str>> {
     Ok(ctx.finish().into())
 }
 
+lazy_static! {
+    static ref PIPELINE_SAVER_REFERENCE: ObjectReference =
+        ObjectReference::new(229740497, "4ecd63eff847044b68db9453ce219299".to_owned(), 3);
+}
+
 /// MonoBehaviour
 fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
     ctx.mapping(|ctx| {
@@ -364,6 +370,15 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
         match name.as_str() {
             "serializedVersion" => {
                 assert_eq!(ctx.next_scalar()?.0, "2", "unknown serializedVersion")
+            }
+            "m_Script" => {
+                let object_reference = ctx.parse_object_reference()?;
+                if object_reference == *PIPELINE_SAVER_REFERENCE {
+                    // PipelineSaver is short-time generated & will be removed on next save so
+                    // remove this object immediately
+                    // https://github.com/anatawa12/git-vrc/issues/3
+                    return Ok(Break(true));
+                }
             }
             "serializedUdonProgramAsset" | "serializedProgramAsset" => {
                 // for serializedUdonProgramAsset or serializedProgramAsset with mapping,

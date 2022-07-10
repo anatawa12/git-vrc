@@ -21,6 +21,7 @@ anyhow = "1"
 itertools = "0.10"
 log = "0.4"
 yaml-rust = { path = "yaml-rust" }
+lazy_static = "1"
 
 [dependencies.simple_logger]
 version = "2"
