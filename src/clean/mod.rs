@@ -41,7 +41,7 @@ impl App {
         let mut sections = Vec::new();
         for (heading, body) in iter {
             trace!("start: {}", heading);
-            let filtered = filter::filter_yaml(body)?;
+            let filtered = filter::first::filter_yaml(body)?;
             sections.push(YamlSection {
                 heading,
                 filtered,
