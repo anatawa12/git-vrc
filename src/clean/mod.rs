@@ -43,9 +43,12 @@ impl App {
         print!("{}{}", first.0, first.1);
 
         while let Some((heading, body)) = iter.next() {
-            print!("{}", heading);
             trace!("start: {}", heading);
-            print!("{}", App::parse_one(body)?);
+            let parsed = App::parse_one(body)?;
+            if !parsed.is_empty() {
+                print!("{}", heading);
+                print!("{}", App::parse_one(body)?);
+            }
         }
 
         Ok(())
@@ -60,7 +63,7 @@ impl App {
         expect_token!(ctx.next()?, Key);
         let object_type = ctx.next_scalar()?.0;
         expect_token!(ctx.next()?, Value);
-        match object_type.as_str() {
+        let omit_current_value = match object_type.as_str() {
             "MonoBehaviour" => mono_behaviour(&mut ctx)?,
             "PrefabInstance" => prefab_instance(&mut ctx)?,
             "RenderSettings" => render_settings(&mut ctx)?,
@@ -69,6 +72,10 @@ impl App {
                 return Ok(yaml.into());
             }
         };
+
+        if omit_current_value {
+            return Ok("".into());
+        }
 
         // closings
         assert!(matches!(ctx.next()?, BlockEnd), "MappingEnd expected");
@@ -153,7 +160,7 @@ impl ObjectReference {
 }
 
 /// MonoBehaviour
-fn mono_behaviour(ctx: &mut Context) -> ParserResult {
+fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
     ctx.mapping(|ctx| {
         let name = ctx.next_scalar()?.0;
         expect_token!(ctx.next()?, Value);
@@ -186,7 +193,7 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult {
 }
 
 /// PrefabInstance
-fn prefab_instance(ctx: &mut Context) -> ParserResult {
+fn prefab_instance(ctx: &mut Context) -> ParserResult<bool> {
     ctx.mapping(|ctx| {
         let key = ctx.next_scalar()?.0;
         expect_token!(ctx.next()?, Value);
@@ -284,7 +291,7 @@ fn should_omit(property_path: &str, value: &str, object_reference: &ObjectRefere
 }
 
 /// RenderSettings
-fn render_settings(ctx: &mut Context) -> ParserResult {
+fn render_settings(ctx: &mut Context) -> ParserResult<bool> {
     ctx.mapping(|ctx| {
         let name = ctx.next_scalar()?.0;
         expect_token!(ctx.next()?, Value);
