@@ -3,6 +3,7 @@ use crate::clean::ObjectReference;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+use std::num::NonZeroUsize;
 use std::ops::ControlFlow;
 use std::ops::ControlFlow::Continue;
 use std::str::Chars;
@@ -49,7 +50,8 @@ struct Context<'a> {
     last_mark: Option<Marker>,
     mark: Option<Marker>,
     next_token: Option<Token>,
-    result: String,
+    will_write: Option<(usize, NonZeroUsize)>,
+    result: Vec<&'a str>,
 }
 
 macro_rules! return_ok_if_break {
@@ -211,7 +213,8 @@ impl<'a> Context<'a> {
             last_mark: None,
             mark: None,
             next_token: None,
-            result: String::with_capacity(yaml.len()),
+            will_write: None,
+            result: Vec::new(),
         }
     }
 
@@ -276,19 +279,50 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn append_str(&mut self, str: &str) {
+    pub(crate) fn append_str(&mut self, str: &'a str) {
         log::trace!("append_str: {}", str);
-        self.result.push_str(str);
+        if !str.is_empty() {
+            self.clear_will_write();
+            self.result.push(str);
+        }
+    }
+
+    fn clear_will_write(&mut self) {
+        if let Some((first, end)) = self.will_write.take() {
+            self.result.push(&self.yaml[first..end.get()]);
+        }
     }
 
     fn append(&mut self, index: usize) {
-        self.result.push_str(&self.yaml[self.printed..index]);
-        self.printed = index;
+        if index == self.printed {
+            return;
+        }
+        assert!(self.printed < index);
+        let index = unsafe { NonZeroUsize::new_unchecked(index) };
+        if let Some((first, end)) = self.will_write.as_mut() {
+            if end.get() == self.printed {
+                *end = unsafe {
+                    NonZeroUsize::new_unchecked(end.get() + (index.get() - self.printed))
+                };
+            } else {
+                self.result.push(&self.yaml[*first..end.get()]);
+                self.will_write = Some((self.printed, index));
+            }
+        } else {
+            self.will_write = Some((self.printed, index));
+        }
+        self.printed = index.get();
     }
 
-    pub(crate) fn finish(mut self) -> String {
-        self.result.push_str(&self.yaml[self.printed..]);
-        self.result
+    pub(crate) fn finish(mut self) -> Cow<'a, str> {
+        self.append(self.yaml.len());
+        self.clear_will_write();
+        if self.result.len() == 1 {
+            return Cow::Borrowed(self.result[0]);
+        }
+        log::trace!("realloc for finish");
+        self.result.push(&self.yaml[self.printed..]);
+        Cow::Owned(self.result.join(""))
     }
 }
 
@@ -738,7 +772,7 @@ mod test_prefab_modifications {
 
     #[test]
     fn without_any_modification() -> anyhow::Result<()> {
-        simple_logger::init_with_level(log::Level::Trace)?;
+        //simple_logger::init_with_level(log::Level::Trace)?;
         // TODO
         assert_eq!(
             filter_yaml(concat!(
