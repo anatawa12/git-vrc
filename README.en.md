@@ -49,7 +49,7 @@ force git to re-index unity files!
 # touch all files in your repository to let git re-index files.
 $ find . -type f -print0 | xargs -0 touch
 # and commit this
-$ git commit -a "chore: start using git-vrc"
+$ git commit -am "chore: start using git-vrc"
 ```
 
 ## License

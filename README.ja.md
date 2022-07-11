@@ -49,7 +49,7 @@ git に再 index してもらうため以下のコマンドを実行してくだ
 # all files in your repository to let git re-index files.
 $ find . -type f -print0 | xargs -0 touch
 # そしてコミットします
-$ git commit -a "chore: start using git-vrc"
+$ git commit -am "chore: start using git-vrc"
 ```
 
 ## License
