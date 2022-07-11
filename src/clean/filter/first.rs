@@ -1,12 +1,30 @@
 use super::super::ObjectReference;
 use super::context::{Context, ParserResult};
+use crate::clean::YamlSection;
 use lazy_static::lazy_static;
 use std::borrow::Cow;
 use std::ops::ControlFlow::{Break, Continue};
 use yaml_rust::scanner::*;
 use TokenType::*;
 
-pub(crate) fn filter_yaml(yaml: &str) -> ParserResult<Cow<str>> {
+pub(in super::super) fn filter(sections: &mut [YamlSection]) -> ParserResult {
+    for section in sections {
+        match &section.filtered {
+            Cow::Borrowed(b) => {
+                section.filtered = filter_yaml(&b)?;
+            }
+            Cow::Owned(o) => {
+                section.filtered = match filter_yaml(&o)? {
+                    Cow::Borrowed(b) => b.to_owned().into(),
+                    Cow::Owned(o) => o.into(),
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn filter_yaml(yaml: &str) -> ParserResult<Cow<str>> {
     assert!(!yaml.is_empty());
     let mut ctx = Context::new(&yaml);
 

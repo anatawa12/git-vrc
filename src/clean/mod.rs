@@ -38,16 +38,18 @@ impl App {
         print!("{}{}", first.0, first.1);
 
         // filter phase
-        let mut sections = Vec::new();
-        for (heading, body) in iter {
-            trace!("start: {}", heading);
-            let filtered = filter::first::filter_yaml(body)?;
-            sections.push(YamlSection {
-                heading,
-                filtered,
-                parsed: ParsedHeadingLine::from_str(heading)?,
+        let mut sections = iter
+            .map(|(heading, body)| -> anyhow::Result<_> {
+                trace!("start: {}", heading);
+                Ok(YamlSection {
+                    heading,
+                    filtered: body.into(),
+                    parsed: ParsedHeadingLine::from_str(heading)?,
+                })
             })
-        }
+            .collect::<Result<Vec<_>, _>>()?;
+
+        filter::first::filter(&mut sections)?;
 
         // optimization
         optimize_yaml(&mut sections);
