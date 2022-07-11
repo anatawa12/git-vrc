@@ -54,6 +54,8 @@ impl App {
         // optimization
         optimize_yaml(&mut sections);
 
+        filter::remove_components::filter(&mut sections)?;
+
         for sec in sections {
             if !sec.filtered.is_empty() {
                 print!("{}{}", sec.heading, sec.filtered);
@@ -179,11 +181,11 @@ impl ObjectReference {
     }
 
     #[allow(dead_code)]
-    pub fn local(file_id: i64, obj_type: u32) -> Self {
+    pub fn local(file_id: i64) -> Self {
         Self {
             file_id,
             guid: None,
-            obj_type,
+            obj_type: 0,
         }
     }
 
@@ -194,6 +196,10 @@ impl ObjectReference {
             guid: None,
             obj_type: 0,
         }
+    }
+
+    pub(crate) fn is_local(&self) -> bool {
+        self.guid.is_none()
     }
 
     #[allow(dead_code)]

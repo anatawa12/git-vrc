@@ -196,10 +196,7 @@ impl<'a> Context<'a> {
                 object_type.expect("type does not exist"),
             ))
         } else {
-            Ok(ObjectReference::local(
-                file_id,
-                object_type.expect("type does not exist"),
-            ))
+            Ok(ObjectReference::local(file_id))
         }
     }
 }
