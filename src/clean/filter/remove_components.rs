@@ -1,7 +1,5 @@
-use super::super::ObjectReference;
 use super::context::{Context, ParserResult};
 use crate::clean::YamlSection;
-use lazy_static::lazy_static;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ops::ControlFlow::Continue;
