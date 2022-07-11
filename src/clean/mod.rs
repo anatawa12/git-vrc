@@ -49,7 +49,7 @@ impl App {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        filter::first::filter(&mut sections)?;
+        filter::main::filter(&mut sections)?;
 
         // optimization
         optimize_yaml(&mut sections);
