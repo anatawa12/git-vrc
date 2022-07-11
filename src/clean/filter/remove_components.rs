@@ -63,20 +63,16 @@ fn filter_yaml(yaml: &str, is_removed: impl Fn(i64) -> bool) -> ParserResult<Cow
     Ok(ctx.finish().into())
 }
 
-lazy_static! {
-    static ref PIPELINE_SAVER_REFERENCE: ObjectReference =
-        ObjectReference::new(229740497, "4ecd63eff847044b68db9453ce219299".to_owned(), 3);
-}
-
 /// GameObject
 fn game_object(ctx: &mut Context, is_removed: impl Fn(i64) -> bool) -> ParserResult<bool> {
     ctx.mapping(|ctx| {
         let name = ctx.next_scalar()?.0;
         expect_token!(ctx.next()?, Value);
         match name.as_str() {
-            "serializedVersion" => {
-                assert_eq!(ctx.next_scalar()?.0, "6", "unknown serializedVersion")
-            }
+            "serializedVersion" => match ctx.next_scalar()?.0.as_str() {
+                "5" | "6" => {}
+                v => panic!("unknown serializedVersion: {}", v),
+            },
             "m_Component" => {
                 ctx.write_until_current_token()?;
                 // some elements must be written because Transform is required component
