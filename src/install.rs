@@ -45,7 +45,7 @@ pub(crate) struct App {
 /// git config options
 pub(crate) struct GitConfigOptions {
     /// --system in git config
-    #[clap(long, default_value = "true")]
+    #[clap(long)]
     system: bool,
     /// --global in git config
     #[clap(long)]

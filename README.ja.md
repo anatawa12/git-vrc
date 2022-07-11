@@ -20,7 +20,7 @@ $ cargo install --locked --git 'https://github.com/anatawa12/git-vrc.git'
 
 ```sh
 # もしこのツールをシステム全体(git config の --system と同等)にインストールしたい場合
-$ sudo git vrc install --config
+$ sudo git vrc install --config --system
 # もしこのツールをユーザー単位(git config の --global と同等)にインストールしたい場合
 $ git vrc install --config --global
 ```

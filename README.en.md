@@ -21,7 +21,7 @@ To install this tool to git, type the following command:
 
 ```sh
 # if you want to install system wide (git config --system wide)
-$ sudo git vrc install --config
+$ sudo git vrc install --config --system
 # if you want to install user globally (git config --global wide)
 $ git vrc install --config --global
 ```
