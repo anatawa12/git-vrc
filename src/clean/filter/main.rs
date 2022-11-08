@@ -151,6 +151,8 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
                 ctx.append_str(" 0");
                 ctx.skip_until_current_token()?;
             }
+            // baseAnimationLayers of VRCAvatarDescriptor
+            "baseAnimationLayers" => mono_behaviour_base_animation_layers(ctx)?,
             "DynamicMaterials" | "DynamicPrefabs" => {
                 // DynamicMaterials or DynamicPrefabs of -17141911:661092b4961be7145bfbe56e1e62337b
                 // (VRC_WorldDescriptor) is runtime (build-time) generated field so
@@ -165,6 +167,33 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
         }
         Ok(Continue(()))
     })
+}
+
+fn mono_behaviour_base_animation_layers(ctx: &mut Context) -> ParserResult {
+    ctx.write_until_current_token()?;
+
+    ctx.sequence(|ctx| {
+        ctx.mapping(|ctx| {
+            let key = ctx.next_scalar()?.0;
+            expect_token!(ctx.next()?, Value);
+
+            match key.as_str() {
+                "mask" => {
+                    // baseAnimationLayers[*].mask of VRCAvatarDescriptor
+                    // https://github.com/anatawa12/git-vrc/issues/19
+                    ctx.write_until_current_token()?;
+                    ctx.skip_next_value()?;
+                    ctx.append_str(" {fileID: 0}");
+                    ctx.skip_until_current_token()?;
+                }
+                _ => ctx.skip_next_value()?,
+            }
+
+            Ok(Continue(()))
+        })?;
+        Ok(Continue(()))
+    })?;
+    Ok(())
 }
 
 /// PrefabInstance
@@ -275,6 +304,13 @@ fn should_omit(property_path: &str, value: &str, object_reference: &ObjectRefere
     {
         // https://github.com/anatawa12/git-vrc/issues/5
         // https://github.com/anatawa12/git-vrc/issues/13
+        return true;
+    }
+    if property_path.starts_with("baseAnimationLayers.Array.data[")
+        && property_path.ends_with("].mask")
+    {
+        // baseAnimationLayers[*].mask of VRCAvatarDescriptor
+        // https://github.com/anatawa12/git-vrc/issues/19
         return true;
     }
     return false;
