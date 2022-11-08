@@ -143,6 +143,14 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
                 ));
                 ctx.skip_until_current_token()?;
             }
+            "completedSDKPipeline" => {
+                // completedSDKPipeline of PipelineManager is automatically computed.
+                // https://github.com/anatawa12/git-vrc/issues/17
+                ctx.write_until_current_token()?;
+                ctx.skip_next_value()?;
+                ctx.append_str(" 0");
+                ctx.skip_until_current_token()?;
+            }
             "DynamicMaterials" | "DynamicPrefabs" => {
                 // DynamicMaterials or DynamicPrefabs of -17141911:661092b4961be7145bfbe56e1e62337b
                 // (VRC_WorldDescriptor) is runtime (build-time) generated field so
@@ -254,6 +262,11 @@ fn should_omit(property_path: &str, value: &str, object_reference: &ObjectRefere
     if property_path == "layerCollisionArr" && object_reference.is_null() {
         // layerCollisionArr of VRC_SceneDescriptor is automatically computed.
         // https://github.com/anatawa12/git-vrc/issues/12
+        return true;
+    }
+    if property_path == "completedSDKPipeline" && object_reference.is_null() {
+        // completedSDKPipeline of PipelineManager is automatically computed.
+        // https://github.com/anatawa12/git-vrc/issues/17
         return true;
     }
     if property_path.starts_with("DynamicMaterials.Array")
@@ -1282,6 +1295,89 @@ mod test_layer_collision_arr {
             "        type: 3}\n",
             "      propertyPath: layerCollisionArr\n",
             "      value: 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n",
+            "      objectReference: {fileID: 0}\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 8894fa7e4588a5c4fab98453e558847d, type: 3}\n",
+            ))?,
+            concat!(
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications: []\n",
+            "    m_RemovedComponents: []\n",
+            "  m_SourcePrefab: {fileID: 100100000, guid: 8894fa7e4588a5c4fab98453e558847d, type: 3}\n",
+            ),
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_completed_sdk_pipeline {
+    use super::*;
+    // see https://github.com/anatawa12/git-vrc/issues/17
+
+    #[test]
+    fn mono_behaviour() -> anyhow::Result<()> {
+        assert_eq!(
+            filter_yaml(concat!(
+            "MonoBehaviour:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  m_CorrespondingSourceObject: {fileID: 0}\n",
+            "  m_PrefabInstance: {fileID: 0}\n",
+            "  m_PrefabAsset: {fileID: 0}\n",
+            "  m_GameObject: {fileID: 973945594870973796}\n",
+            "  m_Enabled: 1\n",
+            "  m_EditorHideFlags: 0\n",
+            "  m_Script: {fileID: -1427037861, guid: 4ecd63eff847044b68db9453ce219299, type: 3}\n",
+            "  m_Name: \n",
+            "  m_EditorClassIdentifier: \n",
+            "  launchedFromSDKPipeline: 0\n",
+            "  completedSDKPipeline: 1\n",
+            "  blueprintId: \n",
+            "  contentType: 0\n",
+            "  assetBundleUnityVersion: \n",
+            "  fallbackStatus: 0\n",
+            ))?,
+            concat!(
+            "MonoBehaviour:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  m_CorrespondingSourceObject: {fileID: 0}\n",
+            "  m_PrefabInstance: {fileID: 0}\n",
+            "  m_PrefabAsset: {fileID: 0}\n",
+            "  m_GameObject: {fileID: 973945594870973796}\n",
+            "  m_Enabled: 1\n",
+            "  m_EditorHideFlags: 0\n",
+            "  m_Script: {fileID: -1427037861, guid: 4ecd63eff847044b68db9453ce219299, type: 3}\n",
+            "  m_Name: \n",
+            "  m_EditorClassIdentifier: \n",
+            "  launchedFromSDKPipeline: 0\n",
+            "  completedSDKPipeline: 0\n",
+            "  blueprintId: \n",
+            "  contentType: 0\n",
+            "  assetBundleUnityVersion: \n",
+            "  fallbackStatus: 0\n",
+            ),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prefab() -> anyhow::Result<()> {
+        assert_eq!(
+            filter_yaml(concat!(
+            "PrefabInstance:\n",
+            "  m_ObjectHideFlags: 0\n",
+            "  serializedVersion: 2\n",
+            "  m_Modification:\n",
+            "    m_TransformParent: {fileID: 0}\n",
+            "    m_Modifications:\n",
+            "    - target: {fileID: 973945594870973798, guid: 27c023e317f775c45aca5b55f6eab077,\n",
+            "        type: 3}\n",
+            "      propertyPath: completedSDKPipeline\n",
+            "      value: 1\n",
             "      objectReference: {fileID: 0}\n",
             "    m_RemovedComponents: []\n",
             "  m_SourcePrefab: {fileID: 100100000, guid: 8894fa7e4588a5c4fab98453e558847d, type: 3}\n",
