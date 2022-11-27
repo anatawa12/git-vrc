@@ -282,7 +282,7 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
 
 #[allow(unused_variables)]
 fn should_omit(property_path: &str, value: &str, object_reference: &ObjectReference) -> bool {
-    if property_path == "serializedProgramAsset" && value == "~" {
+    if property_path == "serializedProgramAsset" && value == "" {
         return true;
     }
     if property_path == "fallbackStatus" && object_reference.is_null() {

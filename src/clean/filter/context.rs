@@ -124,7 +124,7 @@ impl<'a> Context<'a> {
     pub(crate) fn next_scalar(&mut self) -> ParserResult<(String, TScalarStyle)> {
         match self.peek()? {
             BlockEnd | FlowMappingEnd | Key | Value => {
-                return Ok(("~".to_owned(), TScalarStyle::Plain))
+                return Ok((String::new(), TScalarStyle::Plain))
             }
             Scalar(_, _) => {
                 if let Scalar(style, value) = self.next()? {
