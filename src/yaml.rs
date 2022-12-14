@@ -1,3 +1,4 @@
+use log::trace;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -38,17 +39,11 @@ impl<'a> Iterator for YamlSeparated<'a> {
         let mut i = 0;
 
         loop {
-            if let Some(triple_hyphen) = self.str.find("---") {
-                if self.str[..triple_hyphen].chars().last() == Some('\n') {
-                    // it's separator!
-                    i += triple_hyphen;
-                    break;
-                } else {
-                    // it's not a separator. find next
-                    i += triple_hyphen;
-                    let (_, post) = self.str.split_at(triple_hyphen + 3);
-                    self.str = post;
-                }
+            trace!("finding for: {:?}", &split_at_ceil_bytes(self.str, 100));
+            if let Some(new_line_triple_hyphen) = self.str.find("\n---") {
+                // we found separator!
+                i += new_line_triple_hyphen + 1;
+                break;
             } else {
                 i = self.str.len();
                 // there's no separator!
@@ -59,6 +54,37 @@ impl<'a> Iterator for YamlSeparated<'a> {
 
         return Some((heading_line, &str_in[..i]));
     }
+}
+
+fn split_at_ceil_bytes(s: &str, mut cnt: usize) -> &str {
+    if s.len() <= cnt {
+        s
+    } else {
+        while !s.is_char_boundary(cnt) {
+            cnt -= 1;
+        }
+        // SAFETY: s.is_char_boundary(cnt) returns true for here.
+        unsafe { s.get_unchecked(..cnt) }
+    }
+}
+
+#[test]
+fn yaml_separated() {
+    assert_eq!(
+        YamlSeparated::new(concat!(
+            "HEADER\n",
+            "--- Separator\n",
+            "Content Witch contains ---\n",
+            "--- Other Separator\n",
+            "Other Content\n",
+        ))
+        .collect::<Vec<_>>(),
+        vec![
+            ("", "HEADER\n"),
+            ("--- Separator\n", "Content Witch contains ---\n"),
+            ("--- Other Separator\n", "Other Content\n"),
+        ]
+    )
 }
 
 #[derive(Debug)]
