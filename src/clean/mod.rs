@@ -1,8 +1,8 @@
 use crate::yaml::{ParsedHeadingLine, YamlSeparated};
 use log::trace;
 use std::borrow::Cow;
-use std::io::stdin;
 use std::io::Read;
+use std::io::{stdin, stdout, Write};
 use std::str::FromStr;
 
 macro_rules! expect_token {
@@ -32,7 +32,19 @@ pub(crate) struct App {}
 impl App {
     pub(crate) fn run(self) -> anyhow::Result<()> {
         let mut yaml = String::new();
-        stdin().read_to_string(&mut yaml)?;
+        let mut stdin = stdin();
+        const HEADER: &[u8] = b"%YAML";
+        let mut heading = [0u8; HEADER.len()];
+        stdin.read_exact(&mut heading)?;
+        if heading != HEADER {
+            // work as copy
+            let mut stdout = stdout();
+            stdout.write(&heading)?;
+            std::io::copy(&mut stdin, &mut stdout)?;
+            return Ok(());
+        }
+        yaml.push_str(std::str::from_utf8(HEADER).unwrap());
+        stdin.read_to_string(&mut yaml)?;
         let mut iter = YamlSeparated::new(&yaml);
         let first = iter.next().unwrap();
         print!("{}{}", first.0, first.1);
