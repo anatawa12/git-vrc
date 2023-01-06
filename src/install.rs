@@ -328,9 +328,9 @@ fn add_attributes(mut attrs: &str) -> String {
             .map(|c| c.is_ascii_whitespace())
             .unwrap_or(false)
         {
-            result.push_str(" text");
+            result.push_str(" text=auto");
         } else {
-            result.push_str("text");
+            result.push_str("text=auto");
         }
     }
 
