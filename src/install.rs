@@ -235,7 +235,7 @@ fn update_attributes_file<'a>(lines: impl Iterator<Item = &'a str>) -> String {
                     added.insert(name);
                     result.push_str(&line[..first_non_ws]);
                     result.push_str(&trimmed[..name_end]);
-                    result.push_str(&add_attributes(&trimmed[name_end..], "*.unity" != name));
+                    result.push_str(&add_attributes(&trimmed[name_end..], "*.asset" == name));
                     result.push('\n');
                     continue;
                 }
