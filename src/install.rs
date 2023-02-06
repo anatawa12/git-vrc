@@ -157,9 +157,9 @@ impl App {
         }
 
         self.git_config_options
-            .set("filter.vrc.smudge", "git vrc smudge")?;
+            .set("filter.vrc.smudge", "git vrc smudge --file %f")?;
         self.git_config_options
-            .set("filter.vrc.clean", "git vrc clean")?;
+            .set("filter.vrc.clean", "git vrc clean --file %f")?;
         //self.git_config_options
         //    .set("filter.vrc.process", "git vrc filter-process")?;
         self.git_config_options.set("filter.vrc.required", "true")?;
