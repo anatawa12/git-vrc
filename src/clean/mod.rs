@@ -3,7 +3,6 @@ use log::trace;
 use std::borrow::Cow;
 use std::io::Read;
 use std::io::{stdin, stdout, Write};
-use std::path::PathBuf;
 use std::str::FromStr;
 
 macro_rules! expect_token {
@@ -76,7 +75,7 @@ impl App {
 
         let mut sort = self.sort;
         if let Some(path) = self.file {
-            let (path, attr, value) = crate::git::check_attr(&["unity-sort"], &[path.as_str()])?
+            let (_path, _attr, value) = crate::git::check_attr(&["unity-sort"], &[path.as_str()])?
                 .next()
                 .expect("failed to get attr");
             if value.as_str() == "set" {
