@@ -3,7 +3,10 @@ use std::io;
 
 #[derive(Parser)]
 /// Smudge file. This is currently cat command but some feature can be added later.
-pub(crate) struct App {}
+pub(crate) struct App {
+    #[clap(long = "file")]
+    file: Option<String>,
+}
 
 impl App {
     pub(crate) fn run(self) -> anyhow::Result<()> {
