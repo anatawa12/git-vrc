@@ -235,7 +235,7 @@ fn update_attributes_file<'a>(lines: impl Iterator<Item = &'a str>) -> String {
                     added.insert(name);
                     result.push_str(&line[..first_non_ws]);
                     result.push_str(&trimmed[..name_end]);
-                    result.push_str(&add_attributes(&trimmed[name_end..]));
+                    result.push_str(&add_attributes(&trimmed[name_end..], "*.unity" != name));
                     result.push('\n');
                     continue;
                 }
@@ -257,7 +257,7 @@ fn update_attributes_file<'a>(lines: impl Iterator<Item = &'a str>) -> String {
     result
 }
 
-fn add_attributes(mut attrs: &str) -> String {
+fn add_attributes(mut attrs: &str, set_unity_sort: bool) -> String {
     // fast path: if no attributes are defined, append our attributes
     if attrs.is_empty() {
         return format!(" {}", FILE_ATTRIBUTES);
@@ -272,6 +272,7 @@ fn add_attributes(mut attrs: &str) -> String {
     let mut filter_found = false;
     let mut text_found = false;
     let mut eol_found = false;
+    let mut unity_sort_found = false;
 
     loop {
         if let Some(non_ws) = attrs.find(|c: char| !c.is_ascii_whitespace()) {
@@ -303,49 +304,38 @@ fn add_attributes(mut attrs: &str) -> String {
                 );
             }
             eol_found = true
+        } else if attr == "unity-sort" || attr.starts_with("unity-sort=") {
+            unity_sort_found = true;
         }
+    }
+
+    fn append_attr(result: &mut String, attr: &str) {
+        if !result
+            .chars()
+            .rev()
+            .next()
+            .map(|c| c.is_ascii_whitespace())
+            .unwrap_or(false)
+        {
+            result.push(' ');
+        }
+        result.push_str(attr);
     }
 
     if !filter_found {
-        if !result
-            .chars()
-            .rev()
-            .next()
-            .map(|c| c.is_ascii_whitespace())
-            .unwrap_or(false)
-        {
-            result.push_str(" filter=vrc");
-        } else {
-            result.push_str("filter=vrc");
-        }
+        append_attr(&mut result, "filter=vrc");
+    }
+
+    if !unity_sort_found && set_unity_sort {
+        append_attr(&mut result, "unity-sort");
     }
 
     if !text_found {
-        if !result
-            .chars()
-            .rev()
-            .next()
-            .map(|c| c.is_ascii_whitespace())
-            .unwrap_or(false)
-        {
-            result.push_str(" text=auto");
-        } else {
-            result.push_str("text=auto");
-        }
+        append_attr(&mut result, "text=auto");
     }
 
     if !eol_found {
-        if !result
-            .chars()
-            .rev()
-            .next()
-            .map(|c| c.is_ascii_whitespace())
-            .unwrap_or(false)
-        {
-            result.push_str(" eol=lf");
-        } else {
-            result.push_str("eol=lf");
-        }
+        append_attr(&mut result, "eol=lf");
     }
 
     result
