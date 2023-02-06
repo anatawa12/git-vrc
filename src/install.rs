@@ -250,6 +250,9 @@ fn update_attributes_file<'a>(lines: impl Iterator<Item = &'a str>) -> String {
             result.push_str(name);
             result.push(' ');
             result.push_str(FILE_ATTRIBUTES);
+            if &"*.asset" == name {
+                result.push_str(" unity-sort");
+            }
             result.push('\n');
         }
     }
@@ -326,16 +329,16 @@ fn add_attributes(mut attrs: &str, set_unity_sort: bool) -> String {
         append_attr(&mut result, "filter=vrc");
     }
 
-    if !unity_sort_found && set_unity_sort {
-        append_attr(&mut result, "unity-sort");
-    }
-
     if !text_found {
-        append_attr(&mut result, "text=auto");
+        append_attr(&mut result, "text");
     }
 
     if !eol_found {
         append_attr(&mut result, "eol=lf");
+    }
+
+    if !unity_sort_found && set_unity_sort {
+        append_attr(&mut result, "unity-sort");
     }
 
     result
@@ -351,7 +354,7 @@ mod test {
                 concat!(
                     "* text=auto\n",
                     "* eol=lf\n",
-                    "*.asset {0}\n",
+                    "*.asset {0} unity-sort\n",
                     "*.prefab {0}\n",
                     "*.unity {0}\n",
                 ),
@@ -362,7 +365,11 @@ mod test {
         assert_eq!(
             super::update_attributes_file([].into_iter()),
             format!(
-                concat!("*.asset {0}\n", "*.prefab {0}\n", "*.unity {0}\n",),
+                concat!(
+                    "*.asset {0} unity-sort\n",
+                    "*.prefab {0}\n",
+                    "*.unity {0}\n",
+                ),
                 super::FILE_ATTRIBUTES
             )
         );
@@ -373,7 +380,7 @@ mod test {
             ),
             format!(
                 concat!(
-                    "*.asset  eol=lf filter=vrc text\n",
+                    "*.asset  eol=lf filter=vrc text unity-sort\n",
                     "*.prefab text eol=lf   filter=vrc\n",
                     "*.unity {0}\n",
                 ),
@@ -384,14 +391,18 @@ mod test {
         assert_eq!(
             super::update_attributes_file(
                 [
-                    format!("*.asset {0}", super::FILE_ATTRIBUTES).as_str(),
+                    format!("*.asset {0} unity-sort", super::FILE_ATTRIBUTES).as_str(),
                     format!("*.prefab {0}", super::FILE_ATTRIBUTES).as_str(),
                     format!("*.unity {0}", super::FILE_ATTRIBUTES).as_str(),
                 ]
                 .into_iter()
             ),
             format!(
-                concat!("*.asset {0}\n", "*.prefab {0}\n", "*.unity {0}\n",),
+                concat!(
+                    "*.asset {0} unity-sort\n",
+                    "*.prefab {0}\n",
+                    "*.unity {0}\n",
+                ),
                 super::FILE_ATTRIBUTES
             )
         );
