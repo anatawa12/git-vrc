@@ -3,6 +3,7 @@ use log::trace;
 use std::borrow::Cow;
 use std::io::Read;
 use std::io::{stdin, stdout, Write};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 macro_rules! expect_token {
@@ -27,7 +28,12 @@ mod filter;
 
 #[derive(clap::Parser)]
 /// clean file.
-pub(crate) struct App {}
+pub(crate) struct App {
+    #[clap(long = "file")]
+    file: Option<String>,
+    #[clap(long = "sort")]
+    sort: bool,
+}
 
 impl App {
     pub(crate) fn run(self) -> anyhow::Result<()> {
@@ -67,6 +73,20 @@ impl App {
         optimize_yaml(&mut sections);
 
         filter::remove_components::filter(&mut sections)?;
+
+        let mut sort = self.sort;
+        if let Some(path) = self.file {
+            let (path, attr, value) = crate::git::check_attr(&["unity-sort"], &[path.as_str()])?
+                .next()
+                .expect("failed to get attr");
+            if value.as_str() == "set" {
+                sort = true
+            }
+        }
+
+        if sort {
+            sections.sort_by_key(|x| x.parsed.file_id())
+        }
 
         for sec in sections {
             if !sec.filtered.is_empty() {
