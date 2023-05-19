@@ -153,6 +153,26 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
             }
             // baseAnimationLayers of VRCAvatarDescriptor
             "baseAnimationLayers" => mono_behaviour_base_animation_layers(ctx)?,
+            // foldout_* of VRCPhysBone
+            // https://github.com/anatawa12/git-vrc/issues/20
+            "foldout_transforms"
+            | "foldout_forces"
+            | "foldout_collision"
+            | "foldout_stretchsquish"
+            | "foldout_limits"
+            | "foldout_grabpose"
+            | "foldout_options" => {
+                ctx.write_until_current_token()?;
+                ctx.skip_next_value()?;
+                ctx.append_str(" 1");
+                ctx.skip_until_current_token()?;
+            }
+            "foldout_gizmos" => {
+                ctx.write_until_current_token()?;
+                ctx.skip_next_value()?;
+                ctx.append_str(" 0");
+                ctx.skip_until_current_token()?;
+            }
             "DynamicMaterials" | "DynamicPrefabs" => {
                 // DynamicMaterials or DynamicPrefabs of -17141911:661092b4961be7145bfbe56e1e62337b
                 // (VRC_WorldDescriptor) is runtime (build-time) generated field so
@@ -311,6 +331,22 @@ fn should_omit(property_path: &str, value: &str, object_reference: &ObjectRefere
     {
         // baseAnimationLayers[*].mask of VRCAvatarDescriptor
         // https://github.com/anatawa12/git-vrc/issues/19
+        return true;
+    }
+    if matches!(
+        property_path,
+        "foldout_transforms"
+            | "foldout_forces"
+            | "foldout_collision"
+            | "foldout_stretchsquish"
+            | "foldout_limits"
+            | "foldout_grabpose"
+            | "foldout_options"
+            | "foldout_gizmos"
+    ) && object_reference.is_null()
+    {
+        // foldout_* of VRCPhysBone
+        // https://github.com/anatawa12/git-vrc/issues/20
         return true;
     }
     return false;
