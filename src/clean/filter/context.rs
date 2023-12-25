@@ -267,13 +267,7 @@ impl<'a> Context<'a> {
     }
 
     fn mark_pos(&self, mark: Marker) -> usize {
-        if mark.begin().index() == mark.end().index() {
-            // it's position token
-            self.yaml[..mark.begin().index()].trim_end().len()
-        } else {
-            // it's a token
-            mark.end().index()
-        }
+        self.yaml[..mark.end().index()].trim_end().len()
     }
 
     pub(crate) fn append_str(&mut self, str: &'a str) {
