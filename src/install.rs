@@ -409,6 +409,6 @@ mod test {
     }
 }
 
-const FILE_ATTRIBUTES: &'static str = "filter=vrc eol=lf text";
+const FILE_ATTRIBUTES: &'static str = "filter=vrc eol=lf text=auto";
 
 const FILES_CONTROLLED_BY_THIS_TOOL: &'static [&'static str] = &["*.asset", "*.prefab", "*.unity"];

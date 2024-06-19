@@ -36,9 +36,9 @@ $ git add .gitattributes
 または以下のような .gitattributes ファイルを作成してください。
 
 ```gitattributes
-*.asset filter=vrc eol=lf text
-*.prefab filter=vrc eol=lf text
-*.unity filter=vrc eol=lf text
+*.asset filter=vrc eol=lf text=auto
+*.prefab filter=vrc eol=lf text=auto
+*.unity filter=vrc eol=lf text=auto
 ```
 
 最後に、もしすでに unity のファイルを git にコミットしたことがある場合、

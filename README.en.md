@@ -37,9 +37,9 @@ $ git add .gitattributes
 OR you can manually write .gitattributes as following
 
 ```gitattributes
-*.asset filter=vrc eol=lf text
-*.prefab filter=vrc eol=lf text
-*.unity filter=vrc eol=lf text
+*.asset filter=vrc eol=lf text=auto
+*.prefab filter=vrc eol=lf text=auto
+*.unity filter=vrc eol=lf text=auto
 ```
 
 Finally, if there already are some commits with unity files,
