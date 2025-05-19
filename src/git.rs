@@ -52,7 +52,7 @@ pub(crate) fn check_attr(
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "check-attr returns non-utf8",
-            ))
+            ));
         }
     };
 

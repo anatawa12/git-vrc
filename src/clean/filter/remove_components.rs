@@ -1,10 +1,10 @@
 use super::context::{Context, ParserResult};
 use crate::clean::YamlSection;
+use TokenType::*;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ops::ControlFlow::Continue;
 use yaml_rust::scanner::*;
-use TokenType::*;
 
 pub(in super::super) fn filter(sections: &mut [YamlSection]) -> ParserResult {
     let mut removed = HashSet::new();

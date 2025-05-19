@@ -2,7 +2,7 @@ use crate::yaml::{ParsedHeadingLine, YamlSeparated};
 use log::trace;
 use std::borrow::Cow;
 use std::io::Read;
-use std::io::{stdin, stdout, Write};
+use std::io::{Write, stdin, stdout};
 use std::str::FromStr;
 
 macro_rules! expect_token {

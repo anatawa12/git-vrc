@@ -1,4 +1,6 @@
 use crate::clean::ObjectReference;
+use ParserErr::EOF;
+use TokenType::*;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
@@ -7,8 +9,6 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::Continue;
 use std::str::Chars;
 use yaml_rust::scanner::*;
-use ParserErr::EOF;
-use TokenType::*;
 
 pub(crate) type ParserResult<T = ()> = Result<T, ParserErr>;
 
@@ -124,7 +124,7 @@ impl<'a> Context<'a> {
     pub(crate) fn next_scalar(&mut self) -> ParserResult<(String, TScalarStyle)> {
         match self.peek()? {
             BlockEnd | FlowMappingEnd | Key | Value => {
-                return Ok((String::new(), TScalarStyle::Plain))
+                return Ok((String::new(), TScalarStyle::Plain));
             }
             Scalar(_, _) => {
                 if let Scalar(style, value) = self.next()? {
