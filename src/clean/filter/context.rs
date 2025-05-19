@@ -144,7 +144,9 @@ impl<'a> Context<'a> {
                 BlockMappingStart | FlowMappingStart => self.mapping(|ctx| {
                     ctx.skip_next_value()?;
                     expect_token!(ctx.next()?, Value);
-                    ctx.skip_next_value()?;
+                    if !matches!(ctx.peek(), Ok(FlowEntry)) {
+                        ctx.skip_next_value()?;
+                    }
                     Ok(Continue(()))
                 }),
 

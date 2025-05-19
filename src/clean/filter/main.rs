@@ -420,6 +420,30 @@ mod test_generic {
         );
         Ok(())
     }
+
+    #[test]
+    fn null_reference() -> anyhow::Result<()> {
+        // references
+        assert_eq!(
+            filter_yaml(concat!(
+            "MonoBehaviour:\n",
+            "  references:\n",
+            "    version: 2\n",
+            "    RefIds:\n",
+            "    - rid: -2\n",
+            "      type: {class: , ns: , asm: }\n",
+            ))?,
+            concat!(
+            "MonoBehaviour:\n",
+            "  references:\n",
+            "    version: 2\n",
+            "    RefIds:\n",
+            "    - rid: -2\n",
+            "      type: {class: , ns: , asm: }\n",
+            )
+        );
+        Ok(())
+    }
 }
 
 #[cfg(test)]
