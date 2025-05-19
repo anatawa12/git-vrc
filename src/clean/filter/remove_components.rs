@@ -74,7 +74,7 @@ fn game_object(ctx: &mut Context, is_removed: impl Fn(i64) -> bool) -> ParserRes
             "m_Component" => {
                 ctx.write_until_current_token()?;
                 // some elements must be written because Transform is required component
-                ctx.sequence(|ctx| {
+                ctx.sequence::<()>(|ctx| {
                     expect_token!(ctx.next()?, BlockMappingStart);
                     expect_token!(ctx.next()?, Key);
                     assert_eq!(ctx.next_scalar()?.0, "component");

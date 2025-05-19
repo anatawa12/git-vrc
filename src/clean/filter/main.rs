@@ -192,8 +192,8 @@ fn mono_behaviour(ctx: &mut Context) -> ParserResult<bool> {
 fn mono_behaviour_base_animation_layers(ctx: &mut Context) -> ParserResult {
     ctx.write_until_current_token()?;
 
-    ctx.sequence(|ctx| {
-        ctx.mapping(|ctx| {
+    ctx.sequence::<()>(|ctx| {
+        ctx.mapping::<()>(|ctx| {
             let key = ctx.next_scalar()?.0;
             expect_token!(ctx.next()?, Value);
 
@@ -249,13 +249,13 @@ fn prefab_instance_modifications_sequence(ctx: &mut Context) -> ParserResult {
 
     let mut some_written = false;
 
-    ctx.sequence(|ctx| {
+    ctx.sequence::<()>(|ctx| {
         let mut target: Option<ObjectReference> = None;
         let mut property_path: Option<String> = None;
         let mut value: Option<String> = None;
         let mut object_reference: Option<ObjectReference> = None;
 
-        ctx.mapping(|ctx| {
+        ctx.mapping::<()>(|ctx| {
             let key = ctx.next_scalar()?.0;
             expect_token!(ctx.next()?, Value);
 

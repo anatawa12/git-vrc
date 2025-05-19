@@ -176,7 +176,7 @@ impl<'a> Context<'a> {
         let mut guid: Option<String> = None;
         let mut object_type: Option<u32> = None;
 
-        self.mapping(|ctx| {
+        self.mapping::<()>(|ctx| {
             let name = ctx.next_scalar()?.0;
             expect_token!(ctx.next()?, Value);
             match name.as_str() {
