@@ -82,7 +82,7 @@ impl GitConfigOptions {
         let mut command = Command::new("git");
         command.stdin(Stdio::null()).stdout(Stdio::null());
         command.arg("config");
-        command.arg("unset");
+        command.arg("--unset");
         self.options(&mut command);
         command.arg("--").arg(key);
         let status = command.status()?;
