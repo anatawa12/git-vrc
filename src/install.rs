@@ -8,7 +8,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 #[derive(Parser)]
-/// Installs git-lfs
+/// Installs git-vrc to git config or repository
 pub(crate) struct App {
     //// git config targets
     ///// git config target to --system

@@ -3,7 +3,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 
 #[derive(Parser)]
-/// Installs git-lfs
+/// Uninstalls git-vrc from git config
 pub(crate) struct App {
     #[clap(flatten)]
     git_config_options: GitConfigOptions,
