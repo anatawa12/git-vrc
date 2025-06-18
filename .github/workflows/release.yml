@@ -63,12 +63,12 @@ jobs:
           mkdir release
           executable=git-vrc
           for TARGET in x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc x86_64-unknown-linux-musl; do
-            cp -f "artifacts/artifacts-$TARGET/$executable" "release/$executable-$TARGET"
-            cp -f "artifacts/artifacts-$TARGET/$executable.exe" "release/$executable-$TARGET.exe"
+            cp -f "artifacts/artifacts-$TARGET/$executable" "release/$executable-$TARGET" || true
+            cp -f "artifacts/artifacts-$TARGET/$executable.exe" "release/$executable-$TARGET.exe" || true
           done
       - name: Create Draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run:
           VERSION="$(cargo metadata --format-version 1 --no-deps | jq --raw-output '.packages[0].version')"
-          gh release create --generate-notes --draft "v$VERSION" artifacts/*
+          gh release create --generate-notes --draft "v$VERSION" release/*
