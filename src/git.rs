@@ -185,7 +185,6 @@ impl Iterator for GitCheckAttrResult {
         let third_sep = self.index;
         self.index += 1;
 
-        self.index = third_sep;
         unsafe {
             Some((
                 self.str.get_unchecked(begin..first_sep).to_string(),

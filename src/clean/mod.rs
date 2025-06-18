@@ -1,4 +1,5 @@
 use crate::yaml::{ParsedHeadingLine, YamlSeparated};
+use anyhow::bail;
 use log::trace;
 use std::borrow::Cow;
 use std::io::Read;
@@ -36,6 +37,19 @@ pub(crate) struct App {
 
 impl App {
     pub(crate) fn run(self) -> anyhow::Result<()> {
+        let attributes = self
+            .file
+            .as_deref()
+            .map(Attributes::from_git)
+            .transpose()?
+            .unwrap_or_default();
+        if attributes.filter_version > CURRENT_FILTER_VERSION {
+            bail!(
+                "filter version {} is not supported by this version of git-vrc! Please upgrade git-vrc first!",
+                attributes.filter_version
+            );
+        }
+
         let mut yaml = String::new();
         let mut stdin = stdin();
         const HEADER: &[u8] = b"%YAML";
@@ -73,17 +87,7 @@ impl App {
 
         filter::remove_components::filter(&mut sections)?;
 
-        let mut sort = self.sort;
-        if let Some(path) = self.file {
-            let (_path, _attr, value) = crate::git::check_attr(&["unity-sort"], &[path.as_str()])?
-                .next()
-                .expect("failed to get attr");
-            if value.as_str() == "set" {
-                sort = true
-            }
-        }
-
-        if sort {
+        if self.sort || attributes.unity_sort {
             sections.sort_by_key(|x| x.parsed.file_id())
         }
 
@@ -94,6 +98,48 @@ impl App {
         }
 
         Ok(())
+    }
+}
+
+static CURRENT_FILTER_VERSION: u32 = 1;
+
+struct Attributes {
+    unity_sort: bool,
+    filter_version: u32,
+}
+
+impl Default for Attributes {
+    fn default() -> Self {
+        Attributes {
+            unity_sort: false,
+            filter_version: CURRENT_FILTER_VERSION,
+        }
+    }
+}
+
+impl Attributes {
+    fn from_git(path: &str) -> anyhow::Result<Self> {
+        let mut result = Self::default();
+        for (_path, attr, value) in
+            crate::git::check_attr(&["unity-sort", "git-vrc-filter-version"], &[path])?
+        {
+            match attr.as_str() {
+                "unity-sort" => {
+                    result.unity_sort = value.as_str() == "set";
+                }
+                "git-vrc-filter-version" => {
+                    if value == "unspecified" {
+                        // ignore
+                    } else if let Ok(v) = u32::from_str(value.as_str()) {
+                        result.filter_version = v;
+                    } else {
+                        eprintln!("ERR: git-vrc-filter-version attribute is invalid: {value}");
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(result)
     }
 }
 

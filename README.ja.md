@@ -1,3 +1,4 @@
+%YAML
 # git-vrc
 
 Git VRC は VRC のプロジェクトで発生する意味のない diff をへらすための git 拡張です。
@@ -61,6 +62,14 @@ unityyamlのファイル内の要素を fileid でソートすることができ
 
 ```gitattributes
 *.asset filter=vrc eol=lf text=auto unity-sort
+```
+
+### Specifying the filter version to keep git-vrc in sync among repositories
+
+`git-vrc-filter-version` 属性に数値を設定することで、古いバージョンの git-vrc の動作を使用したり、リポジトリがより新しいバージョンの git-vrc フィルタリングを使用している場合にエラーを発生させたりすることができます。
+
+```gitattributes
+*.asset filter=vrc eol=lf text=auto git-vrc-filter-version=1
 ```
 
 ## License

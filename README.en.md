@@ -62,6 +62,15 @@ We can sort elements in the unityyaml file by setting `unity-sort` git attribute
 *.asset filter=vrc eol=lf text=auto unity-sort
 ```
 
+### Specifying the filter version to keep git-vrc in sync among repositories
+
+By setting `git-vrc-filter-version` attribute to number, you can use behavior of older version of git-vrc,
+or have error if the repository uses a newer version of git-vrc filtering.
+
+```gitattributes
+*.asset filter=vrc eol=lf text=auto git-vrc-filter-version=1
+```
+
 ## License
 
 <sub>
