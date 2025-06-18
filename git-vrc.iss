@@ -33,6 +33,15 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; we don't need restart
 RestartIfNeededByRun=no
 
+; add to PATH variable
+[Registry]
+Root: HKEY_LOCAL_MACHINE; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
+    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}" \
+    Check: IsAdminInstallMode     and NeedsAddPath(HKEY_LOCAL_MACHINE, "SYSTEM\CurrentControlSet\Control\Session Manager\Environment", '{app}')
+Root: HKEY_CURRENT_USER;  Subkey: "Environment"; \
+    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}" \
+    Check: not IsAdminInstallMode and NeedsAddPath(HKEY_CURRENT_USER,  "Environment", '{app}')
+
 [Run]
 FileName: "{app}/git-vrc.exe"; Parameters: "install --config --system" Check: IsAdminInstallMode
 FileName: "{app}/git-vrc.exe"; Parameters: "install --config --global" Check: not IsAdminInstallMode
@@ -49,3 +58,20 @@ Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 Source: "target\release\git-vrc.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
+[Code]
+
+function NeedsAddPath(const RootKey: Integer, const SubKey: string, const Key: string, const FindValue: string): boolean;
+var
+  ExpandedValue: string;
+  ExistingValue: string;
+begin
+  ExpandedValue = ExpandConstant(FindValue);
+  if not RegQueryStringValue(RootKey, SubKey, Key, ExistingValue)
+  then begin
+    Result := True;
+    exit;
+  end;
+  { look for the path with leading and trailing semicolon }
+  { Pos() returns 0 if not found }
+  Result := Pos(';' + FindValue + ';', ';' + ExistingValue + ';') = 0;
+end;
