@@ -52,6 +52,17 @@ $ find . -type f -print0 | xargs -0 touch
 $ git commit -am "chore: start using git-vrc"
 ```
 
+## Additional configurations
+
+### Sorting elements in the file
+
+unityyamlのファイル内の要素を fileid でソートすることができます。
+`unity-sort` を attributes で set してください。
+
+```gitattributes
+*.asset filter=vrc eol=lf text=auto unity-sort
+```
+
 ## License
 
 <sub>

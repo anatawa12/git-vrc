@@ -52,6 +52,16 @@ $ find . -type f -print0 | xargs -0 touch
 $ git commit -am "chore: start using git-vrc"
 ```
 
+## Additional configurations
+
+### Sorting elements in the file
+
+We can sort elements in the unityyaml file by setting `unity-sort` git attribute to true.
+
+```gitattributes
+*.asset filter=vrc eol=lf text=auto unity-sort
+```
+
 ## License
 
 <sub>
