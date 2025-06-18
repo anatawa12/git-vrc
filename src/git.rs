@@ -1,3 +1,4 @@
+use clap::{ArgGroup, Parser};
 use log::debug;
 use std::ffi::OsStr;
 use std::io;
@@ -21,6 +22,82 @@ fn get_path_command(args: &[impl AsRef<OsStr>]) -> Option<PathBuf> {
     // remove trailing '\n'
     result.pop();
     Some(PathBuf::from(std::str::from_utf8(&result).ok()?))
+}
+
+#[derive(Parser)]
+#[clap(group(
+    ArgGroup::new("git-config")
+        .required(false)
+        .args(&["system", "global", "local", "worktree"]),
+))]
+/// git config options
+pub(crate) struct GitConfigOptions {
+    /// --system in git config
+    #[clap(long)]
+    system: bool,
+    /// --global in git config
+    #[clap(long)]
+    global: bool,
+    /// --local in git config
+    #[clap(long)]
+    local: bool,
+    /// --worktree in git config
+    #[clap(long)]
+    worktree: bool,
+}
+
+impl GitConfigOptions {
+    pub(crate) fn set_any(&self) -> bool {
+        self.system || self.global || self.local || self.worktree
+    }
+
+    pub(crate) fn exists(&self, key: &str, anywhere: bool) -> io::Result<bool> {
+        let mut command = Command::new("git");
+        command.stdin(Stdio::null()).stdout(Stdio::null());
+        command.arg("config");
+        if !anywhere {
+            self.options(&mut command);
+        }
+        command.arg("--").arg(key);
+        Ok(command.status()?.success())
+    }
+
+    pub(crate) fn set(&self, key: &str, value: &str) -> io::Result<()> {
+        let mut command = Command::new("git");
+        command.stdin(Stdio::null()).stdout(Stdio::null());
+        command.arg("config");
+        self.options(&mut command);
+        command.arg("--").arg(key).arg(value);
+        let status = command.status()?;
+        if !status.success() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "git config command returns non-zero value",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn default_system(&mut self) {
+        if !self.set_any() {
+            self.system = true;
+        }
+    }
+
+    fn options(&self, cmd: &mut Command) {
+        if self.system {
+            cmd.arg("--system");
+        }
+        if self.global {
+            cmd.arg("--global");
+        }
+        if self.local {
+            cmd.arg("--local");
+        }
+        if self.worktree {
+            cmd.arg("--worktree");
+        }
+    }
 }
 
 pub(crate) fn repo_root() -> Option<PathBuf> {
