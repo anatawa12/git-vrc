@@ -6,18 +6,44 @@ This will remove local-specific attributes from `.asset`, `.prefab`, and `.unity
 
 ## Installation
 
-This tool is not yet published however, you can install via cargo with the following command.
+### Windows setup.exe
 
-It's planned to publish this tool via .zip file, homebrew (for linux and macos), and msi installer (for windows).
+If you're on windows, you can use installer can be downloaded from [releases].
 
-```sh
-# If you are not installed rust,
-# please follow the following instruction to install rust
-# https://www.rust-lang.org/tools/install
-$ cargo install --locked --git 'https://github.com/anatawa12/git-vrc.git'
+You can download setup.exe for latest version [here][setup-latest].
+
+This installer not just places the exe to the place, but also runs [setup] steps shown below
+
+### Manual installation
+
+You can download binary from [releases] and manually install to anywhere you want.
+
+Remember renaming executable to git-vrc and adding to PATH environment variable, and process [setup] steps below.
+
+### Cargo Binstall
+
+When you have [cargo binstall], you can install via cargo binstall.
+
+```bash
+cargo binstall --git https://github.com/anatawa12/git-vrc.git git-vrc
 ```
 
-To install this tool to git, type the following command:
+### Cargo install
+
+When you have rust toolchain, you can install via cargo install.
+
+```bash
+cargo install --git https://github.com/anatawa12/git-vrc.git git-vrc
+```
+
+[cargo binstall]: https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#cargo-binaryinstall
+[setup-latest]: https://github.com/anatawa12/git-vrc/releases/latest/download/git-vrc-setup.exe
+[releases]: https://github.com/anatawa12/git-vrc/releases
+[setup]: #setting-up-git
+
+## Setting up git
+
+To set up this tool for git, type the following command:
 
 ```sh
 # if you want to install system wide (git config --system wide)
@@ -34,7 +60,7 @@ $ git vrc install --attributes
 $ git add .gitattributes
 ```
 
-OR you can manually write .gitattributes as following
+OR you can manually write .gitattributes like following
 
 ```gitattributes
 *.asset filter=vrc eol=lf text=auto

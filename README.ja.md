@@ -1,4 +1,3 @@
-%YAML
 # git-vrc
 
 Git VRC は VRC のプロジェクトで発生する意味のない diff をへらすための git 拡張です。
@@ -7,17 +6,44 @@ Git VRC は VRC のプロジェクトで発生する意味のない diff をへ�
 
 ## Installation
 
-このツールはリリースされてませんが、 cargo を使用して以下のコマンドでインストール可能です。
+### Windows setup.exe
 
-このツールは zip ファイル、 linux と macos 向けに homebrew、 windows 向けに msi インストーラで公開する予定です。
+Windows をお使いの場合は、[releases] からダウンロードできるインストーラーを使用できます。
 
-```sh
-# もし rust をインストールしていなければ、以下のリンクの通り rust をインストールしてください。
-# https://www.rust-lang.org/tools/install
-$ cargo install --locked --git 'https://github.com/anatawa12/git-vrc.git'
+最新バージョンの setup.exe は [こちら][setup-latest] からダウンロードできます。
+
+このインストーラーは単に exe を所定の場所に配置するだけでなく、下記の [setup] 手順も実行します。
+
+### Manual installation
+
+[releases] からバイナリをダウンロードして、任意の場所に手動でインストールできます。
+
+実行ファイルの名前を `git-vrc` に変更し、PATH 環境変数に追加すること、そして下記の [setup] 手順を実行することを忘れないでください。
+
+### Cargo Binstall
+
+[cargo binstall] を使っている場合は、以下のコマンドでインストールできます：
+
+```bash
+cargo binstall --git https://github.com/anatawa12/git-vrc.git git-vrc
 ```
 
-このツールを git にインストールするため、以下のコマンドを実行してください。
+### Cargo install
+
+Rust ツールチェーンがある場合は、以下のコマンドでインストールできます：
+
+```bash
+cargo install --git https://github.com/anatawa12/git-vrc.git git-vrc
+```
+
+[cargo binstall]: https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#cargo-binaryinstall
+[setup-latest]: https://github.com/anatawa12/git-vrc/releases/latest/download/git-vrc-setup.exe
+[releases]: https://github.com/anatawa12/git-vrc/releases
+[setup]: #setting-up-git
+
+## Setting up git
+
+このツールを Git に設定するには、次のコマンドを実行してください：
 
 ```sh
 # もしこのツールをシステム全体(git config の --system と同等)にインストールしたい場合
