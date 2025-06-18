@@ -1,0 +1,71 @@
+name: Release
+on:
+  workflow_dispatch: 
+
+# TODO: use something releaser?
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            rustflags: -C target-feature=+crt-static
+          - target: x86_64-unknown-linux-musl
+            os: windows-latest
+            rustflags: -C target-feature=+crt-static
+    runs-on: ${{ matrix.os }}
+    env: 
+      RUSTFLAGS: ${{ matrix.rustflags }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release
+      - name: Build Installer
+        if: ${{ runner.os == 'Windows' }}
+        run: iscc git-vrc.iss
+
+      - name: Copy files for distribution
+        shell: bash
+        run: |
+          mkdir build
+          cp target/release/git-vrc* build/ || true
+          cp Output/* build/ || true
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.target }}
+          path: build
+
+  create-release-draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          path: artifacts
+      - name: Merge artifacts
+        run: |
+          mkdir release
+          executable=git-vrc
+          for TARGET in x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc x86_64-unknown-linux-musl; do
+            cp -f "artifacts/artifacts-$TARGET/$executable" "release/$executable-$TARGET"
+            cp -f "artifacts/artifacts-$TARGET/$executable.exe" "release/$executable-$TARGET.exe"
+          done
+      - name: Create Draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run:
+          VERSION="$(cargo metadata --format-version 1 --no-deps | jq --raw-output '.packages[0].version')"
+          gh release create --generate-notes --draft "v$VERSION" artifacts/*
