@@ -34,13 +34,15 @@ jobs:
         run: cargo build --release
       - name: Build Installer
         if: ${{ runner.os == 'Windows' }}
-        run: iscc git-vrc.iss
+        run: |
+          cp target/*/release/git-vrc* target/release
+          iscc git-vrc.iss
 
       - name: Copy files for distribution
         shell: bash
         run: |
           mkdir build
-          cp target/release/git-vrc* build/ || true
+          cp target/*/release/git-vrc* build/ || true
           cp Output/* build/ || true
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
