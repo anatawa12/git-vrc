@@ -32,23 +32,25 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; we don't need restart
 RestartIfNeededByRun=no
+; disable warn for user areas since we're checking for user / system install with IsAdminInstallMode
+UsedUserAreasWarning=no
 
 ; add to PATH variable
 [Registry]
-Root: HKEY_LOCAL_MACHINE; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
-    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}" \
-    Check: IsAdminInstallMode     and NeedsAddPath(HKEY_LOCAL_MACHINE, "SYSTEM\CurrentControlSet\Control\Session Manager\Environment", '{app}')
-Root: HKEY_CURRENT_USER;  Subkey: "Environment"; \
-    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}" \
-    Check: not IsAdminInstallMode and NeedsAddPath(HKEY_CURRENT_USER,  "Environment", '{app}')
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
+    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
+    Check: IsAdminInstallMode     and NeedsAddPathSystem(ExpandConstant('{app}'))
+Root: HKCU;  Subkey: "Environment"; \
+    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
+    Check: not IsAdminInstallMode and NeedsAddPathUser(ExpandConstant('{app}'))
 
 [Run]
-FileName: "{app}/git-vrc.exe"; Parameters: "install --config --system" Check: IsAdminInstallMode
-FileName: "{app}/git-vrc.exe"; Parameters: "install --config --global" Check: not IsAdminInstallMode
+FileName: "{app}/git-vrc.exe"; Parameters: "install --config --system"; Check: IsAdminInstallMode
+FileName: "{app}/git-vrc.exe"; Parameters: "install --config --global"; Check: not IsAdminInstallMode
 
 [UninstallRun]
-FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --system" Check: IsAdminInstallMode
-FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --global" Check: not IsAdminInstallMode
+FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --system"; Check: IsAdminInstallMode;     RunOnceId: "com.anatawa12.git-vrc.system"
+FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --global"; Check: not IsAdminInstallMode; RunOnceId: "com.anatawa12.git-vrc.local"
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -60,12 +62,10 @@ Source: "target\release\git-vrc.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Code]
 
-function NeedsAddPath(const RootKey: Integer, const SubKey: string, const Key: string, const FindValue: string): boolean;
+function NeedsAddPath(const RootKey: Integer; const SubKey: string; const Key: string; const FindValue: string): boolean;
 var
-  ExpandedValue: string;
   ExistingValue: string;
 begin
-  ExpandedValue = ExpandConstant(FindValue);
   if not RegQueryStringValue(RootKey, SubKey, Key, ExistingValue)
   then begin
     Result := True;
@@ -74,4 +74,14 @@ begin
   { look for the path with leading and trailing semicolon }
   { Pos() returns 0 if not found }
   Result := Pos(';' + FindValue + ';', ';' + ExistingValue + ';') = 0;
+end;
+
+function NeedsAddPathSystem(const FindValue: string): boolean;
+begin
+  Result := NeedsAddPath(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', FindValue);
+end;
+
+function NeedsAddPathUser(const FindValue: string): boolean;
+begin
+  Result := NeedsAddPath(HKEY_CURRENT_USER, 'Environment', 'Path', FindValue);
 end;
