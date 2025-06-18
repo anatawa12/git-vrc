@@ -45,12 +45,12 @@ Root: HKCU;  Subkey: "Environment"; \
     Check: not IsAdminInstallMode and NeedsAddPathUser(ExpandConstant('{app}'))
 
 [Run]
-FileName: "{app}/git-vrc.exe"; Parameters: "install --config --system"; Check: IsAdminInstallMode
-FileName: "{app}/git-vrc.exe"; Parameters: "install --config --global"; Check: not IsAdminInstallMode
+FileName: "{app}/git-vrc.exe"; Parameters: "install --config --system"; Check: IsAdminInstallMode;     Flags: logoutput runhidden
+FileName: "{app}/git-vrc.exe"; Parameters: "install --config --global"; Check: not IsAdminInstallMode; Flags: logoutput runhidden
 
 [UninstallRun]
-FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --system"; Check: IsAdminInstallMode;     RunOnceId: "com.anatawa12.git-vrc.system"
-FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --global"; Check: not IsAdminInstallMode; RunOnceId: "com.anatawa12.git-vrc.local"
+FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --system"; Check: IsAdminInstallMode;     RunOnceId: "com.anatawa12.git-vrc.system"; Flags: logoutput runhidden
+FileName: "{app}/git-vrc.exe"; Parameters: "uninstall --config --global"; Check: not IsAdminInstallMode; RunOnceId: "com.anatawa12.git-vrc.local";  Flags: logoutput runhidden
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
