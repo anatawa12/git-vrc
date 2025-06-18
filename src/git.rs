@@ -78,6 +78,23 @@ impl GitConfigOptions {
         Ok(())
     }
 
+    pub(crate) fn unset(&self, key: &str) -> io::Result<()> {
+        let mut command = Command::new("git");
+        command.stdin(Stdio::null()).stdout(Stdio::null());
+        command.arg("config");
+        command.arg("unset");
+        self.options(&mut command);
+        command.arg("--").arg(key);
+        let status = command.status()?;
+        if !status.success() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "git config command returns non-zero value",
+            ));
+        }
+        Ok(())
+    }
+
     pub(crate) fn default_system(&mut self) {
         if !self.set_any() {
             self.system = true;
