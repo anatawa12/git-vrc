@@ -5,6 +5,7 @@ mod clean;
 mod git;
 mod install;
 mod smudge;
+mod uninstall;
 mod yaml;
 
 use anyhow::Result;
@@ -16,6 +17,7 @@ use simple_logger::SimpleLogger;
 #[clap(author, version, about)]
 enum Commands {
     Install(install::App),
+    Uninstall(uninstall::App),
     Smudge(smudge::App),
     Clean(clean::App),
 }
@@ -30,6 +32,7 @@ fn main() -> Result<()> {
 
     match args {
         Commands::Install(app) => app.run(),
+        Commands::Uninstall(app) => app.run(),
         Commands::Smudge(app) => app.run(),
         Commands::Clean(app) => app.run(),
     }
