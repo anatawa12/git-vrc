@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "git-vrc"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion ReadIni(SourcePath + "Cargo.toml", "package", "version")
 #define MyAppPublisher "anatawa12"
 #define MyAppURL "https://github.com/anatawa12/git-vrc"
 
