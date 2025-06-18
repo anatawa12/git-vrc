@@ -72,6 +72,7 @@ jobs:
       - name: Create Draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run:
+        run: |
           VERSION="$(cargo metadata --format-version 1 --no-deps | jq --raw-output '.packages[0].version')"
+          echo "version $VERSION"
           gh release create --generate-notes --draft "v$VERSION" release/*
