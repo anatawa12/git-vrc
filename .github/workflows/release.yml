@@ -69,7 +69,7 @@ jobs:
             cp -f "artifacts/artifacts-$TARGET/$executable" "release/$executable-$TARGET" || true
             cp -f "artifacts/artifacts-$TARGET/$executable.exe" "release/$executable-$TARGET.exe" || true
           done
-          cp artifacts/artifacts-x86_64-pc-windows-msvc/git-vrc-setup.exe
+          cp artifacts/artifacts-x86_64-pc-windows-msvc/git-vrc-setup.exe release/git-vrc-setup.exe
       - name: Create Draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
