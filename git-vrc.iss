@@ -24,7 +24,7 @@ LicenseFile=LICENSE-MIT
 ; Uncomment the following line to run in non administrative install mode (install for current user only).
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-OutputBaseFilename=vrc-get-setup
+OutputBaseFilename=git-vrc-setup
 SolidCompression=yes
 WizardStyle=modern
 ; x64 install mode
